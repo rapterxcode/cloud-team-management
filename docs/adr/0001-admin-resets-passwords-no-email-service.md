@@ -1,0 +1,3 @@
+# No self-service password reset; admins reset passwords directly
+
+The platform has no outbound email service (SMTP relay or transactional email API) in its 4-service stack (`web`, `api`, `postgres`, `caddy`), and adding one purely to support "forgot password" emails would introduce infrastructure not otherwise needed for an internal tool with admin-provisioned accounts. Instead, a locked-out user's password is reset by an `admin`, either through an in-app "reset password" action or a CLI command against the `api` container. Self-service, email-based reset can be added later without changing this decision if the team grows past the point where manual admin resets are practical.
