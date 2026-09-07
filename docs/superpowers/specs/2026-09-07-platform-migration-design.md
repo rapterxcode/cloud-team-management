@@ -47,7 +47,7 @@ Vinext-specific files are removed: `next.config.ts`, root `vite.config.ts`, `.op
 
 Definitions follow `CONTEXT.md` (User, Team, Role, Deactivated user, Task owner, Project department, Attachment).
 
-- **users** — id, email (unique), password_hash (Node `crypto.scrypt`; no argon2 dependency), name, role (`admin` | `member`), title, is_active, created_at. Users are deactivated, never deleted.
+- **users** — id, email (unique), password_hash (Node `crypto.scrypt`; no argon2 dependency), name, role (`admin` | `member`), title, is_active, workload (int %, manually set; feeds the Team page and Overview workload bars — added during planning to preserve existing UI), created_at. Users are deactivated, never deleted.
 - **projects** — id, name, description, status (`On track` | `At risk`), progress (manually set integer 0–100), **department** (free text; renamed from `team`), due, color, created_at.
 - **tasks** — id, project_id FK, name, **owner_id FK → users.id** (required), phase (`Planning` | `Development` | `Launch`), status (`To do` | `In progress` | `Done`), priority (`High` | `Medium` | `Low`; defaults `Medium`, no picker UI — preserved behavior), start date, due date (validation rules identical to `lib/gantt.mjs`: both-or-neither, finish ≥ start).
 - **knowledge_articles** — id, name, category (`Guides` | `Runbooks` | `Onboarding` | `Meeting notes`), body, author_id FK → users.id, created_at, updated_at.
