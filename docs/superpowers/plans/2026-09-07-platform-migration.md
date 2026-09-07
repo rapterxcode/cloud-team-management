@@ -211,7 +211,7 @@ Expected: 9/9 lib tests pass; `vite build` completes with a `dist/` folder. If `
 
 - [ ] **Step 5: Update .gitignore and commit**
 
-Replace line `/node_modules` in `.gitignore` with `node_modules/` and add lines `dist/`, `web/dist/`. Then:
+Replace line `/node_modules` in `.gitignore` with `node_modules/` and add lines `dist/` (matches `web/dist` and `api/dist` at any depth) and `attachments-dev/` (the API's local dev/test upload dir). Then:
 ```bash
 git add web/ .gitignore
 git commit -m "refactor: move SPA into web/ package on plain Vite (drop Vinext)"
@@ -281,6 +281,8 @@ git commit -m "refactor: move SPA into web/ package on plain Vite (drop Vinext)"
 }
 ```
 Imports between api files use `.js` extensions (NodeNext style): `import { createApp } from '../src/app.js'`.
+
+**Express 5 compatibility check:** after `npm install`, confirm `express-session` and `multer` load under Express 5 (both list Express as a peer). If a runtime/peer error appears, pin the last known-good line for each rather than downgrading Express — Express 5 is required by the spec's stack.
 
 - [ ] **Step 2: Prisma schema**
 
@@ -394,6 +396,7 @@ Run: `cd api && npm install && npx prisma migrate dev --name init` (needs the te
 import { PrismaClient } from '@prisma/client';
 import { createApp } from '../src/app.js';
 import { hashPassword } from '../src/passwords.js';
+import { resetLoginLimiter } from '../src/middleware.js';
 
 export const prisma = new PrismaClient();
 
@@ -401,6 +404,7 @@ export async function resetDb() {
   await prisma.$executeRawUnsafe(
     'TRUNCATE users, projects, tasks, knowledge_articles, knowledge_attachments, cloud_resources CASCADE',
   );
+  resetLoginLimiter(); // the limiter Map is process-global; clear it so test order can't leak attempts
 }
 
 export async function makeServer() {
@@ -435,7 +439,9 @@ export function authed(cookie: string, method = 'GET', body?: unknown): RequestI
   };
 }
 ```
-(`passwords.js` doesn't exist yet — created in Task 3; for this task, temporarily comment its import and the `createUser` body, or just create `src/passwords.ts` now as part of Task 3 ordering. Simplest: leave helpers as written and implement passwords in Task 3 — this task's test only touches `/api/health`, so create a stub `api/src/passwords.ts` now: `export async function hashPassword(p: string){ return 'stub:' + p; }` — Task 3 replaces it test-first.)
+`helpers.ts` imports two modules that Task 3 implements. So this task's health test can run, create both as **stubs now** (Task 3 replaces them test-first):
+- `api/src/passwords.ts`: `export async function hashPassword(p: string){ return 'stub:' + p; }`
+- `api/src/middleware.ts`: `export function resetLoginLimiter(){}`
 
 `api/test/health.test.ts`:
 ```ts
@@ -466,6 +472,15 @@ import connectPgSimple from 'connect-pg-simple';
 import pg from 'pg';
 import type { PrismaClient } from '@prisma/client';
 
+// One shared pool for the whole process. createApp() is called once per test
+// server, so a per-call `new pg.Pool` would leak connections and exhaust
+// Postgres across a ~20-case suite.
+let sessionPool: pg.Pool | undefined;
+function getSessionPool() {
+  if (!sessionPool) sessionPool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  return sessionPool;
+}
+
 export function createApp(prisma: PrismaClient) {
   const app = express();
   app.set('trust proxy', 1);
@@ -475,7 +490,7 @@ export function createApp(prisma: PrismaClient) {
   app.use(
     session({
       store: new PgStore({
-        pool: new pg.Pool({ connectionString: process.env.DATABASE_URL }),
+        pool: getSessionPool(),
         createTableIfMissing: true,
       }),
       secret: process.env.SESSION_SECRET ?? 'dev-secret',
@@ -684,6 +699,11 @@ export function loginLimiter(req: Request, res: Response, next: NextFunction) {
   else slot.count += 1;
   next();
 }
+
+// Replaces the Task 2 stub. Tests call this from resetDb() so the process-global Map can't leak attempts across cases.
+export function resetLoginLimiter() {
+  attempts.clear();
+}
 ```
 
 `api/src/routes/auth.ts`:
@@ -783,6 +803,7 @@ test('seed creates deactivated demo users, demo data, and an env admin; runs twi
 
 ```ts
 import { PrismaClient } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { hashPassword } from '../src/passwords.js';
 
 const DEMO_USERS = [
@@ -798,7 +819,7 @@ export async function seed(prisma: PrismaClient) {
     const u = await prisma.user.upsert({
       where: { email: d.email },
       update: {},
-      create: { ...d, isActive: false, role: 'member', passwordHash: await hashPassword(crypto.randomUUID()) },
+      create: { ...d, isActive: false, role: 'member', passwordHash: await hashPassword(randomUUID()) },
     });
     users[d.name] = u.id;
   }
@@ -935,6 +956,25 @@ test('duplicate email returns 400 with error body', async () => {
   assert.ok((await dup.json()).error);
   await close();
 });
+
+test('the last active admin cannot deactivate or demote themselves; short passwords rejected', async () => {
+  const { base, close } = await makeServer();
+  const admin = await createUser('admin@team.test', 'pw123456', 'admin');
+  const { cookie } = await login(base, 'admin@team.test', 'pw123456');
+
+  const selfOff = await fetch(base + `/api/users/${admin.id}`, authed(cookie, 'PATCH', { isActive: false }));
+  assert.equal(selfOff.status, 400);
+  const demote = await fetch(base + `/api/users/${admin.id}`, authed(cookie, 'PATCH', { role: 'member' }));
+  assert.equal(demote.status, 400);
+  const shortPw = await fetch(base + '/api/users', authed(cookie, 'POST', { email: 'x@team.test', name: 'X', password: 'short' }));
+  assert.equal(shortPw.status, 400);
+
+  // With a second admin present, demotion is allowed.
+  await createUser('admin2@team.test', 'pw123456', 'admin');
+  const ok = await fetch(base + `/api/users/${admin.id}`, authed(cookie, 'PATCH', { role: 'member' }));
+  assert.equal(ok.status, 200);
+  await close();
+});
 ```
 
 - [ ] **Step 2: Run to verify failure** — `npm test` → FAIL (404s).
@@ -960,6 +1000,7 @@ export function usersRoutes(prisma: PrismaClient) {
   r.post('/', requireAdmin(prisma), async (req, res) => {
     const { email, name, password, title = '', role = 'member', workload = 0 } = req.body ?? {};
     if (!email || !name || !password) return res.status(400).json({ error: 'Email, name and password are required' });
+    if (String(password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
     if (!['admin', 'member'].includes(role)) return res.status(400).json({ error: 'Role must be admin or member' });
     if (await prisma.user.findUnique({ where: { email: String(email).toLowerCase() } }))
       return res.status(400).json({ error: 'A user with this email already exists' });
@@ -983,6 +1024,14 @@ export function usersRoutes(prisma: PrismaClient) {
     const { name, title, role, isActive, workload, password } = req.body ?? {};
     if (role !== undefined && !['admin', 'member'].includes(role))
       return res.status(400).json({ error: 'Role must be admin or member' });
+    if (password !== undefined && String(password).length < 8)
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    // Last-admin guard: never let the final active admin be deactivated or demoted.
+    const demoting = (role !== undefined && role !== 'admin') || isActive === false;
+    if (existing.role === 'admin' && existing.isActive && demoting) {
+      const otherAdmins = await prisma.user.count({ where: { role: 'admin', isActive: true, id: { not: existing.id } } });
+      if (otherAdmins === 0) return res.status(400).json({ error: 'Cannot deactivate or demote the last active admin' });
+    }
     const u = await prisma.user.update({
       where: { id: req.params.id },
       data: {
@@ -1849,7 +1898,7 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
 ```tsx
 import { useState } from 'react';
 import { Cloud } from 'lucide-react';
-import { post } from '@/lib/api';
+import { api, post } from '@/lib/api';
 import type { Me } from '@/lib/types';
 
 export default function Login({ onLogin }: { onLogin: (me: Me) => void }) {
@@ -1885,7 +1934,6 @@ export default function Login({ onLogin }: { onLogin: (me: Me) => void }) {
   );
 }
 ```
-(also import `api` alongside `post` at the top: `import { api, post } from '@/lib/api';`)
 
 Append login styles to the END of `web/src/globals.css`:
 ```css
@@ -1984,7 +2032,7 @@ Also delete the now-unused `import {validateDates} from '@/lib/gantt.mjs';` from
 - Task owner display: any JSX using `t.owner` as a string (e.g. `<small>{t.owner} · {t.due}</small>` and `<p>{t.owner}</p>`) → change `t.owner` to `t.ownerName`.
 - Owner select in the create-task form: replace `{members.map(([name])=><NativeSelectOption key={name}>{name}</NativeSelectOption>)}` with `{activeUsers.map(u=><NativeSelectOption key={u.id} value={u.id}>{u.name}</NativeSelectOption>)}` and rename the select `name="owner"` → `name="ownerId"`.
 - ProjectGantt usage: replace `onUpdate={(id,changes)=>setTasks(updateItem(tasks,id,changes))}` with `onUpdate={(id,changes)=>{editTask(id,changes).catch(()=>{});}} onDelete={removeTask}`.
-- Remove `completeTask` and (if now unused) `updateItem` from the `@/lib/workspace.mjs` import in App.tsx; keep `addItem`-style helpers only where still referenced (`filterItems`, `projectTasks` remain used).
+- Narrow the `@/lib/workspace.mjs` import to exactly `import {filterItems,projectTasks} from '@/lib/workspace.mjs';`. After Task 12, `addItem`, `completeTask`, and `updateItem` are all replaced by API calls and no longer referenced in App.tsx; `filterItems` (visibleProjects/visibleTasks) and `projectTasks` (selectedTasks) remain. The `workspace.mjs` file itself is unchanged — it keeps all exports so its tests still pass.
 
 - [ ] **Step 3: Add delete to `web/src/project-gantt.tsx`**
 
@@ -2060,7 +2108,7 @@ Give the dialog's Name input `defaultValue={editingProject?.name||editing?.name|
 ```tsx
  if(modal==='project'){if(editingProject){await saveProject(data);setModal('');return;}const p=await post<Project>('/projects',{name,description:(data.get('description') as string || 'Ready to get started.')});setProjects([...projects,p]);}
 ```
-And in the Dialog `onOpenChange` close handler add `setEditingProject(null);setEditingResource(null);`.
+And in the Dialog `onOpenChange` close handler add `setEditingProject(null);setEditingResource(null);`. Also fix the dialog title so edits don't read "Create": change `<DialogTitle>{editing?'Edit':'Create'} {modal}</DialogTitle>` to `<DialogTitle>{(editing||editingProject||editingResource)?'Edit':'Create'} {modal}</DialogTitle>`.
 
 - [ ] **Step 4: Resource table rework + create button**
 
@@ -2092,7 +2140,11 @@ In the article view dialog, next to the "Edit article" button add:
 ```tsx
 <button className="text-button" onClick={()=>article&&removeArticle(article.id)}>Delete article</button>
 ```
-Reports: replace the hardcoded `<strong>$2,000<small>/ month</small></strong>` with `<strong>${totalMonthly.toLocaleString()}<small>/ month</small></strong>`, and inside the Reports panel replace any hardcoded per-row spend strings by mapping `resourceRows` (`{r.name} — ${r.monthlyCost}` rows with the existing markup/classes).
+Reports: the source has **two** hardcoded `$2,000` occurrences — the stats-card tuple value and the banner `<strong>$2,000<small>/ month</small></strong>`. Replace BOTH with `${totalMonthly.toLocaleString()}`. The "Spend by provider" chart aggregates **by provider** (not per resource) — its current literal is `[['AWS',1158],['Google Cloud',628],['Azure',214]]`. Compute that grouping from `resourceRows` and add it near the other derived values in Step 1:
+```tsx
+ const spendByProvider=Object.entries(resourceRows.reduce<Record<string,number>>((acc,r)=>{acc[r.provider]=(acc[r.provider]||0)+r.monthlyCost;return acc;},{}));
+```
+Then replace the literal `[['AWS',1158],...].map(...)` in the "Spend by provider" panel with `spendByProvider.map(([name,amount])=>...)` keeping the existing `progress-label` + `<Progress value={Number(amount)/20} .../>` markup unchanged.
 
 ```bash
 cd web && npm run build && npm test && git add src && git commit -m "feat(web): edit/delete for projects, resources, articles; computed reports"
@@ -2265,8 +2317,22 @@ Append to END of `web/src/globals.css`:
 ### Task 15: Docker — api image, caddy image, compose, env
 
 **Files:**
-- Create: `api/Dockerfile`, `caddy/Dockerfile`, `caddy/Caddyfile`, `.env.example`
+- Create: `api/Dockerfile`, `.dockerignore` (repo root), `caddy/Dockerfile`, `caddy/Caddyfile`, `.env.example`
 - Replace: `compose.yml` (the old dev compose is superseded — Docker is production-only now)
+
+- [ ] **Step 1a: root `.dockerignore` (required). Both image builds use `context: .` (repo root), so Docker only honors a `.dockerignore` at that root — a per-package one is ignored. Without it, `COPY api/ ./` / `COPY web/ ./` overwrite the freshly-installed `node_modules` with the host's (wrong architecture) and break the image.**
+
+`.dockerignore` (repo root):
+```
+**/node_modules
+**/dist
+.git
+.env
+*.log
+.wrangler
+.next
+.vinext
+```
 
 - [ ] **Step 1: `api/Dockerfile`**
 
@@ -2339,7 +2405,8 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [api]
+    depends_on:
+      api: { condition: service_healthy }
 
   api:
     build: { context: ., dockerfile: api/Dockerfile }
@@ -2353,6 +2420,11 @@ services:
       NODE_ENV: production
     volumes:
       - attachments:/attachments
+    healthcheck:
+      test: ['CMD-SHELL', 'node -e "fetch(\"http://localhost:3000/api/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
     depends_on:
       postgres: { condition: service_healthy }
 

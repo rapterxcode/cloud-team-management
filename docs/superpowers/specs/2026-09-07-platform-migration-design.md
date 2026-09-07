@@ -142,3 +142,5 @@ Prisma seed script, idempotent:
 | 17 | Web serving | Caddy serves SPA directly; no Nginx container |
 | 18 | Password hashing | Node `crypto.scrypt` (no argon2 native dep) |
 | 19 | Edit/delete UI | added for all entities (new scope, approved) |
+| 20 | Last-admin safety | API blocks deactivating/demoting the final active admin |
+| 21 | Password policy | server enforces min 8 chars on create and reset |
