@@ -2421,7 +2421,8 @@ services:
     volumes:
       - attachments:/attachments
     healthcheck:
-      test: ['CMD-SHELL', 'node -e "fetch(\"http://localhost:3000/api/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      # exec form + single-quoted JS avoids YAML/shell quote-escaping; node:22-slim has no curl/wget.
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 5s
       timeout: 3s
       retries: 20
