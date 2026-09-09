@@ -26,6 +26,11 @@
   export DATABASE_URL=postgresql://postgres:test@localhost:5433/ctm_test
   ```
   After schema changes: `cd api && npx prisma migrate dev`. All `tsx --test` commands run from `api/`.
+- **Execution deltas (applied during Tasks 2–3; committed code is authoritative).** These were discovered running the real stack and apply to every API task:
+  1. api `test` script is `NODE_ENV=test tsx --test --test-force-exit --test-concurrency=1 test/*.test.ts` — force-exit because the pg pool keeps the loop alive; concurrency=1 because test files share one Postgres.
+  2. `app.ts` session store: shared `pg.Pool` with `allowExitOnIdle` under test, and `pruneSessionInterval: false` under test (its timer otherwise blocks exit once a session is written).
+  3. `helpers.ts`: `resetDb()` also truncates connect-pg-simple's `session` table (guarded via `to_regclass`) for per-test isolation; `login()` reads the cookie with `res.headers.getSetCookie()[0]`, NOT `get('set-cookie')` (undici returns null/joined values for it).
+  4. auth `login` route calls `req.session.save(cb)` before responding, so an immediately-following request (logout) reliably sees the session — a real durability fix, not just test hygiene.
 - Commit after every task. The pre-existing app source (`app/`, `components/`, `lib/`, `hooks/`) is currently untracked in git — Task 1 moves it with `mv` then `git add`s the new locations.
 
 ## File Structure (end state)
