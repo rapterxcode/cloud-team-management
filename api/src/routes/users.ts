@@ -35,7 +35,7 @@ export function usersRoutes(prisma: PrismaClient) {
   });
 
   r.patch('/:id', requireAdmin(prisma), async (req, res) => {
-    const existing = await prisma.user.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.user.findUnique({ where: { id: String(req.params.id) } });
     if (!existing) return res.status(404).json({ error: 'User not found' });
     const { name, title, role, isActive, workload, password } = req.body ?? {};
     if (role !== undefined && !['admin', 'member'].includes(role))
@@ -49,7 +49,7 @@ export function usersRoutes(prisma: PrismaClient) {
       if (otherAdmins === 0) return res.status(400).json({ error: 'Cannot deactivate or demote the last active admin' });
     }
     const u = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: String(req.params.id) },
       data: {
         ...(name !== undefined ? { name: String(name).trim() } : {}),
         ...(title !== undefined ? { title: String(title) } : {}),

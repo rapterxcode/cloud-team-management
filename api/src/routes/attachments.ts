@@ -33,7 +33,8 @@ export function attachmentUploadRoutes(prisma: PrismaClient) {
   const upload = makeUpload();
 
   r.post('/:id/attachments', (req, res, next) => {
-    upload.single('file')(req, res, async (err: (Error & { status?: number; code?: string }) | null) => {
+    // multer's callback slot is typed as NextFunction; use `any` and narrow inside.
+    upload.single('file')(req, res, async (err: any) => {
       if (err) {
         const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : (err.status ?? 400);
         return res.status(status).json({ error: err.code === 'LIMIT_FILE_SIZE' ? 'File is larger than 25 MB' : err.message });
