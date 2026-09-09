@@ -1,0 +1,70 @@
+services:
+  caddy:
+    build: { context: ., dockerfile: caddy/Dockerfile }
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api: { condition: service_healthy }
+
+  api:
+    build: { context: ., dockerfile: api/Dockerfile }
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/ctm
+      SESSION_SECRET: ${SESSION_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ATTACHMENTS_DIR: /attachments
+      NODE_ENV: production
+    volumes:
+      - attachments:/attachments
+    healthcheck:
+      # exec form + single-quoted JS avoids YAML/shell quote-escaping; node:22-slim has no curl/wget.
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ctm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d ctm']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backup:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ctm
+    volumes:
+      - backups:/backups
+      - attachments:/attachments:ro
+      - ./backup/backup.sh:/backup.sh:ro
+    entrypoint: ['bash', '/backup.sh']
+    depends_on:
+      postgres: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  attachments:
+  backups:
+  caddy_data:
+  caddy_config:
