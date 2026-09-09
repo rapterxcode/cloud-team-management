@@ -9,6 +9,12 @@ export async function resetDb() {
   await prisma.$executeRawUnsafe(
     'TRUNCATE users, projects, tasks, knowledge_articles, knowledge_attachments, cloud_resources CASCADE',
   );
+  // Clear the session store too so tests are isolated (connect-pg-simple's
+  // "session" table isn't a Prisma model). Guarded because it doesn't exist
+  // until the first makeServer() creates it.
+  await prisma.$executeRawUnsafe(
+    `DO $$ BEGIN IF to_regclass('public.session') IS NOT NULL THEN EXECUTE 'TRUNCATE session'; END IF; END $$;`,
+  );
   resetLoginLimiter(); // the limiter Map is process-global; clear it so test order can't leak attempts
 }
 
@@ -32,7 +38,9 @@ export async function login(base: string, email: string, password: string) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, password }),
   });
-  const cookie = res.headers.get('set-cookie')?.split(';')[0] ?? '';
+  // Use getSetCookie(), not get('set-cookie'): undici's get() can return null or
+  // a comma-joined value for Set-Cookie, which silently breaks cookie reuse.
+  const cookie = res.headers.getSetCookie()[0]?.split(';')[0] ?? '';
   return { status: res.status, cookie };
 }
 
