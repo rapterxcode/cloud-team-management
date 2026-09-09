@@ -31,6 +31,7 @@
   2. `app.ts` session store: shared `pg.Pool` with `allowExitOnIdle` under test, and `pruneSessionInterval: false` under test (its timer otherwise blocks exit once a session is written).
   3. `helpers.ts`: `resetDb()` also truncates connect-pg-simple's `session` table (guarded via `to_regclass`) for per-test isolation; `login()` reads the cookie with `res.headers.getSetCookie()[0]`, NOT `get('set-cookie')` (undici returns null/joined values for it).
   4. auth `login` route calls `req.session.save(cb)` before responding, so an immediately-following request (logout) reliably sees the session — a real durability fix, not just test hygiene.
+  5. Tasks 11–14 (web) were implemented as one coherent `App.tsx` rewrite (state from API, login gate, edit/delete, admin, attachments, computed Reports) rather than line-by-line edits to the dense original — the committed `web/src/` is authoritative. `project-gantt.tsx` owner field became a user `<select>` (value=id) so owner edits send `ownerId`. Verified: `tsc --noEmit` + `vite build` clean, 9/9 lib tests, and an end-to-end curl smoke confirmed every endpoint shape matches `web/src/lib/types.ts`.
 - Commit after every task. The pre-existing app source (`app/`, `components/`, `lib/`, `hooks/`) is currently untracked in git — Task 1 moves it with `mv` then `git add`s the new locations.
 
 ## File Structure (end state)
