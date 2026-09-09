@@ -1,8 +1,14 @@
-# Handoff — Platform Migration (in progress: 10/18 tasks done)
+# Handoff — Platform Migration (COMPLETE: 18/18 tasks, kept on branch for review)
 
-**Date:** 2026-09-07 (updated 2026-09-09) · **Branch:** `feat/platform-migration` · **Status:** Backend complete. Tasks 1–10 done and committed; Tasks 11–18 remain.
+**Date:** 2026-09-07 (completed 2026-09-09) · **Branch:** `feat/platform-migration` (21 commits ahead of `main`, not merged — kept for your review) · **Status:** ✅ Done and verified.
 
-**TL;DR (ไทย):** เริ่ม implement แล้ว — เสร็จ Task 1–10 (ทั้ง SPA scaffold + API ครบทุก endpoint) API test 23/23 ผ่าน, build ผ่านทั้งสอง package. เหลือ Task 11–14 (ต่อ web เข้ากับ API + login UI + edit/delete) และ 15–18 (Docker/backup/docs/cleanup). ทำงานบน branch `feat/platform-migration`.
+**TL;DR (ไทย):** ย้ายระบบเสร็จครบทั้ง 18 tasks แล้ว — SPA (Vite) + API (Express/Prisma) + Postgres หลัง Caddy(HTTPS) + backup. Test ผ่านหมด (web 9/9, api 23/23), รัน stack จริงผ่าน Docker ได้ (login + ดึงข้อมูล + backup + ซ้อม restore ผ่าน). **ยังไม่ merge เข้า main** — เก็บไว้บน branch `feat/platform-migration` ให้รีวิว/ทดสอบก่อน. เมื่อพอใจแล้ว merge ด้วย `git checkout main && git merge feat/platform-migration`.
+
+## How to run / review
+- **Deploy for real:** `cp .env.example .env`, ใส่ค่า (DOMAIN + secrets + admin), แล้ว `docker compose up -d --build` → เปิด `https://<DOMAIN>`. รายละเอียด: `docs/DEPLOY.md`.
+- **Local HTTPS trial:** ตั้ง `DOMAIN=localhost` ใน `.env` แล้ว `docker compose up -d --build` → `https://localhost` (Caddy ออก cert internal ให้; cookie เป็น Secure จึงต้อง HTTPS).
+- **Run tests:** web `npm --prefix web test`; api ต้องมี Postgres ทดสอบ (`docker run -d --name ctm-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=ctm_test -p 5433:5432 postgres:17`, `export DATABASE_URL=postgresql://postgres:test@localhost:5433/ctm_test`, `cd api && npx prisma migrate dev`, `npm test`).
+- Evidence log: `VALIDATION.md`. A `ctm-test-pg` container may still be running on :5433 from the build session — `docker rm -f ctm-test-pg` to remove it.
 
 ## Progress
 
@@ -10,8 +16,8 @@
 |---|---|---|
 | 1 | web/ SPA on plain Vite (Tailwind via PostCSS, @shadcn/react) | ✅ 9/9 lib tests, build clean |
 | 2–10 | Full API: scaffold, auth, seed, users, projects, tasks, knowledge, attachments, resources | ✅ 23/23 tests, `tsc` build clean |
-| 11–14 | web: API client + login gate; wire mutations; edit/delete UI + computed Reports; admin panel + attachments UI | ⏳ next |
-| 15–18 | Docker (Caddy+api+pg+backup), backup script, DEPLOY.md + restore rehearsal, cleanup/CLAUDE/VALIDATION | ⏳ |
+| 11–14 | web: API client + login gate; wire mutations; edit/delete UI + computed Reports; admin panel + attachments UI | ✅ builds clean, e2e contract verified |
+| 15–18 | Docker (Caddy+api+pg+backup), backup script, DEPLOY.md + restore rehearsal, cleanup/CLAUDE/VALIDATION | ✅ stack verified over HTTPS; restore rehearsed |
 
 ## To resume
 - Test Postgres for the API suite: `docker run -d --name ctm-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=ctm_test -p 5433:5432 postgres:17` then `export DATABASE_URL=postgresql://postgres:test@localhost:5433/ctm_test`. Run api tests with `npm --prefix api test` (a `ctm-test-pg` container may already be running from the build session).
