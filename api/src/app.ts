@@ -9,6 +9,7 @@ import { usersRoutes } from './routes/users.js';
 import { projectsRoutes } from './routes/projects.js';
 import { tasksRoutes } from './routes/tasks.js';
 import { knowledgeRoutes } from './routes/knowledge.js';
+import { attachmentUploadRoutes, attachmentsRoutes } from './routes/attachments.js';
 
 // One shared pool for the whole process. createApp() is called once per test
 // server, so a per-call `new pg.Pool` would leak connections and exhaust
@@ -62,7 +63,9 @@ export function createApp(prisma: PrismaClient) {
   app.use('/api/users', usersRoutes(prisma));
   app.use('/api/projects', projectsRoutes(prisma));
   app.use('/api/tasks', tasksRoutes(prisma));
+  app.use('/api/knowledge', attachmentUploadRoutes(prisma));
   app.use('/api/knowledge', knowledgeRoutes(prisma));
+  app.use('/api/attachments', attachmentsRoutes(prisma));
   // More routes mounted by later tasks.
 
   app.use((err: Error & { status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
