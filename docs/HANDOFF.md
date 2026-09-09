@@ -1,8 +1,26 @@
-# Handoff — Platform Migration (paused before implementation)
+# Handoff — Platform Migration (in progress: 10/18 tasks done)
 
-**Date:** 2026-09-07 · **Status:** Design + plan approved and committed. **Zero application code changed yet** — the original Vinext demo app is intact and still runs.
+**Date:** 2026-09-07 (updated 2026-09-09) · **Branch:** `feat/platform-migration` · **Status:** Backend complete. Tasks 1–10 done and committed; Tasks 11–18 remain.
 
-**TL;DR (ไทย):** ออกแบบและวางแผนการย้ายระบบไป self-hosted Docker เสร็จสมบูรณ์แล้ว (spec + plan 18 tasks อยู่ใน git) ยังไม่ได้เริ่มเขียนโค้ดแม้แต่บรรทัดเดียว กลับมาเมื่อไหร่ให้เริ่มรัน Task 1 ตามไฟล์ plan ได้เลย
+**TL;DR (ไทย):** เริ่ม implement แล้ว — เสร็จ Task 1–10 (ทั้ง SPA scaffold + API ครบทุก endpoint) API test 23/23 ผ่าน, build ผ่านทั้งสอง package. เหลือ Task 11–14 (ต่อ web เข้ากับ API + login UI + edit/delete) และ 15–18 (Docker/backup/docs/cleanup). ทำงานบน branch `feat/platform-migration`.
+
+## Progress
+
+| Tasks | What | Status |
+|---|---|---|
+| 1 | web/ SPA on plain Vite (Tailwind via PostCSS, @shadcn/react) | ✅ 9/9 lib tests, build clean |
+| 2–10 | Full API: scaffold, auth, seed, users, projects, tasks, knowledge, attachments, resources | ✅ 23/23 tests, `tsc` build clean |
+| 11–14 | web: API client + login gate; wire mutations; edit/delete UI + computed Reports; admin panel + attachments UI | ⏳ next |
+| 15–18 | Docker (Caddy+api+pg+backup), backup script, DEPLOY.md + restore rehearsal, cleanup/CLAUDE/VALIDATION | ⏳ |
+
+## To resume
+- Test Postgres for the API suite: `docker run -d --name ctm-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=ctm_test -p 5433:5432 postgres:17` then `export DATABASE_URL=postgresql://postgres:test@localhost:5433/ctm_test`. Run api tests with `npm --prefix api test` (a `ctm-test-pg` container may already be running from the build session).
+- web: `npm --prefix web test` / `npm --prefix web run build`.
+- Continue at plan **Task 11**. The plan's Global Constraints "Execution deltas" note captures the important API harness fixes already applied.
+- Real fixes made during execution (all committed): PostCSS Tailwind (not @tailwindcss/vite), @shadcn/react dep, login `req.session.save()` durability race, undici `getSetCookie()`, per-test session-table reset, `--test-force-exit --test-concurrency=1`, tsc casts for `req.params.id`/multer cb.
+
+## Original design/plan status (unchanged)
+Design + plan for all 18 tasks approved and committed (spec + plan in `docs/superpowers/`).
 
 ## What this migration is
 
