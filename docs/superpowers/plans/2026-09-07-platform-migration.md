@@ -88,6 +88,7 @@ compose.yml  .env.example  docs/DEPLOY.md
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "@base-ui/react": "1.7.0",
+    "@shadcn/react": "0.3.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "1.1.1",
@@ -103,7 +104,8 @@ compose.yml  .env.example  docs/DEPLOY.md
     "tw-animate-css": "1.4.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "4.2.1",
+    "@tailwindcss/postcss": "4.2.1",
+    "postcss": "8.5.6",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
@@ -113,16 +115,18 @@ compose.yml  .env.example  docs/DEPLOY.md
   }
 }
 ```
+> **Tailwind integration note:** use `@tailwindcss/postcss` (the PostCSS plugin, as the original app did), NOT `@tailwindcss/vite`. `@tailwindcss/vite@4.2.1` peers Vite ≤7, while `@vitejs/plugin-react@6` peers Vite 8 — they can't coexist. The PostCSS plugin has no Vite-version peer, so it keeps Vite 8 + plugin-react 6 working. `@shadcn/react@0.3.0` is a runtime dep of the vendored `components/ui` (e.g. `message-scroller.tsx`) and `tsc` type-checks those files, so it must be present.
 
 `web/vite.config.ts`:
 ```ts
 import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
+import tailwindcss from '@tailwindcss/postcss';
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react()],
+  css: { postcss: { plugins: [tailwindcss()] } },
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: { proxy: { '/api': 'http://localhost:3000' } },
 });
@@ -207,7 +211,7 @@ The old `app/layout.tsx` is NOT ported (delete it: `rm app/layout.tsx 2>/dev/nul
 ```bash
 cd web && npm install && npm test && npm run build
 ```
-Expected: 9/9 lib tests pass; `vite build` completes with a `dist/` folder. If `tsc` flags pre-existing issues inside `src/components/ui` (vendored), add `"exclude": ["src/components/ui"]`… do NOT — instead keep `skipLibCheck` and fix only import-path errors; vendored components must compile as they did before (they were part of the same tsconfig previously).
+Expected: 9/9 lib tests pass; `vite build` completes with a `dist/` folder. `tsc` type-checks the vendored `src/components/ui` files, so every package they import must be a declared dependency — do NOT exclude `components/ui` from tsconfig. The only missing one is `@shadcn/react` (already added to `dependencies` above); if `tsc` reports another `Cannot find module` for a vendored file, add that package rather than excluding the file. Verified end state: `2050 modules transformed`, `dist/` written.
 
 - [ ] **Step 5: Update .gitignore and commit**
 
