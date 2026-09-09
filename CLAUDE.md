@@ -2,52 +2,60 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **⚠ Migration in progress (paused):** an approved re-platform to a self-hosted Docker stack is designed and planned but **not yet implemented** — read `docs/HANDOFF.md` first before doing any work here. Everything below describes the current (old) Vinext app, which is still accurate until the plan's Task 1 begins.
-
 ## Commands
 
 ```sh
-npm ci                       # Node >= 22.13 required
-npm run dev                  # vinext dev — http://localhost:3000
-npm run build                # vinext build -> dist/
-npm run start                # wrangler dev --config dist/server/wrangler.json (build first)
+# web (Vite + React SPA)  — from web/
+cd web && npm install
+npm run dev        # http://localhost:5173, proxies /api → localhost:3000
+npm test           # node --test src/lib/*.test.mjs
+npm run build      # tsc --noEmit + vite build
 
-node --test lib/*.test.mjs   # all behavior tests
-node --test lib/gantt.test.mjs   # single test file
-npx oxlint app lib           # authored-code lint gate (use this one)
-npm run lint                 # full-tree oxlint; has known pre-existing findings in components/ui + hooks
+# api (Express + Prisma)  — from api/
+cd api && npm install
+docker run -d --name ctm-test-pg -e POSTGRES_PASSWORD=test -e POSTGRES_DB=ctm_test -p 5433:5432 postgres:17
+export DATABASE_URL=postgresql://postgres:test@localhost:5433/ctm_test
+npx prisma migrate dev
+npm test           # NODE_ENV=test tsx --test (needs the Postgres above)
+npm run dev        # tsx watch src/index.ts on :3000
+
+# production (server)
+cp .env.example .env   # fill DOMAIN + secrets + first admin
+docker compose up -d --build
 ```
-
-`npm run format` (oxfmt) will reformat the hand-authored dense files in `app/` and `lib/` wholesale. Scope formatting to files you actually changed, or skip it.
-
-## This is not a Next.js app
-
-`next.config.ts`, the `app/` directory, and `next/font/google` imports look like Next, but **`next` is not a dependency**. `vinext` supplies the Next-compatible API surface and app-router semantics on top of Vite + `@vitejs/plugin-rsc`. Everything (dev, build, types via `vinext/types`) flows through `vite.config.ts`.
-
-The deploy target is Cloudflare Workers. There is no checked-in `wrangler.toml` — bindings are built inline in `vite.config.ts` from `.openai/hosting.json`, whose `d1`/`r2` are currently `null`, so no bindings exist. The D1 `database_id` there is a local Miniflare placeholder. `project_id` points at the already-hosted Site; local dev never publishes to it.
 
 ## Architecture
 
-**Single-page, session-only state.** `app/page.tsx` is one `'use client'` component holding every piece of state (`view`, `projects`, `tasks`, `knowledge`, `query`, `filter`, `modal`, `detail`). Navigation is a `view` string matched against the `nav` array — there are no routes beyond `/`. Seed data lives as module constants (`initialProjects`, `initialTasks`, `members`, `resources`, `initialKnowledge`). Changes are React state only; a reload resets everything. No database, auth, or cloud-provider connection.
+Monorepo, two packages behind one Caddy ingress. Full spec:
+`docs/superpowers/specs/2026-09-07-platform-migration-design.md`; domain terms:
+`CONTEXT.md`; deploy + restore: `docs/DEPLOY.md`.
 
-**Logic lives in plain `.mjs` under `lib/`, not in components.** This is the testable seam and the reason `node --test` works with zero test dependencies:
-
-- `lib/workspace.mjs` — pure array transforms (`addItem`, `updateItem`, `completeTask`, `filterItems`, `projectTasks`, `timelineTasks`). Every state mutation in `page.tsx` goes through these.
-- `lib/gantt.mjs` — `validateDates()` (throws user-facing messages) and `schedule(tasks)` returning `{start, days, bars:[{id, offset, duration}]}` with inclusive day ranges across month boundaries.
-
-When adding behavior, put it in a `lib/*.mjs` module with a `node:test` case first, then wire the component to it.
-
-**`app/project-gantt.tsx`** is presentation over `schedule()`: it takes `tasks` plus `onAdd`/`onUpdate` callbacks (state stays in `page.tsx`), buckets tasks into the fixed `phases` array (`Planning`/`Development`/`Launch`), and derives pixel geometry from `zoom` and `plan.days`.
-
-**`app/globals.css`** has two halves. Lines 1–135 are generated shadcn/Tailwind v4 scaffolding (`@theme inline`, token definitions, `@layer base`). Line 136 to the end is hand-authored compact CSS: the real palette override, app-specific classes (`.app-sidebar`, `.project-card`, `.gantt-panel`, `.knowledge-grid`, …) and the responsive breakpoints at 1500/1150/700px. The app is styled with those plain classes, not Tailwind utilities — edit the bottom section, not the token block.
-
-**`components/ui/`** (60 files) is generated shadcn output — `base-nova` style, RSC-enabled, backed by `@base-ui/react`. Treat as vendored; its lint findings are intentionally preserved.
-
-`page.tsx` also feature-detects `document.modelContext` and registers a read-only `navigate_workspace` WebMCP tool, aborting on unmount. It is optional and silently skipped when absent.
+- **web/** — plain Vite SPA (React 19 + Tailwind 4 via `@tailwindcss/postcss`,
+  NOT `@tailwindcss/vite`). All state lives in `src/App.tsx`, loaded from the
+  API on login. Pure logic in `src/lib/workspace.mjs` + `src/lib/gantt.mjs`
+  (node --test, zero test deps). `src/components/ui` is vendored shadcn
+  (`@shadcn/react`) — don't lint/refactor it. Styling is hand-written classes
+  at the bottom of `src/globals.css`, not Tailwind utilities.
+- **api/** — Express 5 + Prisma + Postgres. `createApp(prisma)` in `src/app.ts`;
+  one route file per entity in `src/routes/*`; validation constants + gantt-
+  mirrored date rules in `src/validate.ts` (messages must stay in sync with
+  web's `gantt.mjs`). Sessions in Postgres (connect-pg-simple), scrypt
+  passwords (`src/passwords.ts`, no argon2). Tests hit a real Postgres via
+  `fetch`; no mocks. The test script uses `--test-force-exit --test-concurrency=1`
+  (pg pool keeps the loop alive; files share one DB).
+- **Deploy** — `caddy/Dockerfile` builds the SPA into the Caddy image (no web
+  runtime container); Caddy serves it and proxies `/api/*`. `api` runs
+  `prisma migrate deploy` + idempotent seed on start. `backup` dumps nightly
+  (02:00, 14-day retention).
 
 ## Conventions
 
-- `@/*` resolves to the repo root (`@/lib/...`, `@/components/ui/...`).
-- Authored `app/` and `lib/` code is deliberately dense (minimal whitespace, multiple declarations per line). Match it rather than expanding it.
-- `VALIDATION.md` is the evidence log for this project: each feature records its TDD red/green counts, scope limits, and which checks passed. Append to it when adding behavior instead of rewriting past entries.
-- No git repository — this is a source export. `README-EXPORT.md` records the upstream commit.
+- Users are deactivated, never deleted (`tasks.owner_id` FK must stay valid);
+  the last active admin can't be demoted/deactivated.
+- `Project.department` is the schema name for the UI's "Team" label.
+- Enum lists (project status / task phase·status·priority / knowledge category)
+  are fixed; validate server-side against `src/validate.ts`.
+- The session cookie is `Secure` in production — the app needs HTTPS (Caddy
+  provides it). Use `DOMAIN=localhost` for a locally-trusted HTTPS trial.
+- No email service (ADR-0001): admins reset passwords in-app.
+- VALIDATION.md is the evidence log — append per feature, don't rewrite.
