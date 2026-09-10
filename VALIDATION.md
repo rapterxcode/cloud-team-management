@@ -85,3 +85,57 @@ Branch `feat/actionable-copilot-knowledge-markdown`. Actionable Copilot (Phase 3
 - Create/Edit article dialog features Write (Markdown) and Preview tabs.
 - Search bar highlights matched terms with `<mark className="search-highlight">` in article card titles and snippets in real-time.
 
+---
+
+## ISO 27001 & Bank of Thailand (BOT) Audit Compliance Management — 2026-09-10
+
+Branch `feat/iso27001-bot-compliance-management`. IT Governance and Audit Readiness milestone covering direct project document evidence uploads (CRA, Architecture Diagram, RBAC Matrix, CC/CR, Test Evidence), Segregation of Duties (SoD) with a dedicated read-only `auditor` role, task-to-CR/CC change traceability, task-to-SOP runbook links, and a Central Compliance Matrix view.
+
+**Design & Governance Records:**
+- `CONTEXT.md`: Ubiquitous language extended for `auditor`, `Project document`, `Compliance matrix`, `Task SOP`, and `Change authorization`.
+- ADRs:
+  - `docs/adr/0003-auditor-role-for-iso27001-bot-compliance.md` (Read-only auditor role for SoD)
+  - `docs/adr/0004-task-change-traceability-to-project-documents.md` (Deployment task change traceability)
+  - `docs/adr/0005-project-document-deletion-governance.md` (Evidence deletion governance: uploader/admin only, blocked for auditors)
+- Implementation Plan: `docs/superpowers/plans/2026-09-10-iso27001-bot-audit-compliance-management.md` (10 tasks executed via Multi-Agent SDLC loop in an isolated worktree).
+
+**Database Migration & Schema:**
+- Migration `20260910152826_iso27001_bot_audit_compliance`:
+  - Created `project_documents` table with fields `id`, `project_id`, `stored_name`, `original_name`, `mime_type`, `size_bytes`, `category`, `reference_no`, `uploaded_by`, and `created_at`.
+  - Added foreign keys and relations: `Task.sopArticleId`, `Task.changeDocumentId`, `KnowledgeArticle.projectId`, `User.projectDocuments`.
+  - Seed script updated with demo compliance auditor (`auditor@cloudteam.internal`), seeded CRA/Diagram/CC documents, and deployment task traceability.
+
+**Backend Implementation & Tests:**
+- Middleware: Added `requireAuditorReadOnly` guard in `api/src/middleware.ts` mounted in `app.ts` after `/api/auth`. All mutations (POST, PUT, PATCH, DELETE) by users with `role === 'auditor'` return `403 Forbidden` with a standardized audit error message.
+- Project Documents API (`api/src/routes/project-documents.ts`):
+  - `GET /api/projects/:id/documents` & `GET /api/project-documents`: Filterable by category, includes uploader metadata.
+  - `POST /api/projects/:id/documents`: Multipart upload up to 25MB with strict file extension allow-list (`.pdf`, `.xlsx`, `.docx`, `.png`, `.jpg`, `.svg`, etc.) and audit category assertion.
+  - `GET /api/project-documents/:id/download`: Dispatches file with `Content-Disposition: attachment`.
+  - `GET /api/project-documents/:id/preview`: In-browser streaming with `Content-Disposition: inline` and proper MIME types.
+  - `DELETE /api/project-documents/:id`: Deletion governance (only uploader or admin; blocked for auditors and non-owner members).
+- Task Audit Traceability (`api/src/routes/tasks.ts`): `POST` and `PATCH` accept and link `sopArticleId` and `changeDocumentId`; queries return full relations.
+- Central Compliance Matrix API (`api/src/routes/compliance.ts`): `GET /api/compliance/matrix` calculates project readiness (CRA, Diagram, RBAC, CC, and deployment traceability), readiness percentages, and missing checkpoints.
+- Tests: `npm --prefix api test` → **41/41 pass** (37 prior + auditor guard + project documents CRUD/preview/download/governance + task traceability + compliance matrix endpoint).
+- Build: `npm --prefix api run build` clean (`tsc -p tsconfig.json`).
+
+**Web Client Implementation & Tests:**
+- `web/src/lib/types.ts`: Added `AuditCategory`, `ProjectDocument`, and task audit relation types.
+- `web/src/lib/compliance.mjs` & `compliance.test.mjs`: Pure calculation library for ISO/BOT audit readiness with 100% test coverage (0%, 100%, and partial readiness).
+- `web/src/project-documents.tsx`: Tabbed document view with filetype icons, category badges, upload modal (up to 25MB), in-browser previewer (PDF iframe, images), download, and role-guarded deletion.
+- `web/src/compliance-matrix.tsx`: Central oversight table with KPI cards (total, ready, pending, avg score), checkpoint badges (CRA, Diagram, RBAC, CC, Deployment Traceability), search, department filter, and "View Audit Files" deep link.
+- `web/src/task-drawer.tsx`: Added Change Authorization selector (CR/CC) with "Authorized by" badge and preview button; added SOP Runbook selector with "Read Runbook" link.
+- `web/src/App.tsx`: Wired Compliance matrix in navigation, tab toggle in Project workspace (`[Tasks & Timeline] [Audit Documents (ISO/BOT)]`), and prominent top notice for auditors (`🛡️ Compliance Inspector Mode (Read-Only)`). Mutation buttons are hidden for auditors.
+- Tests: `npm --prefix web test` → **19/19 pass** (14 prior + 5 pure compliance unit tests).
+- Build: `npm --prefix web run build` clean (`tsc --noEmit` 0 errors, `vite build` emitted).
+
+**Live Integration & Docker Verification (Stage 6):**
+- `docker compose up -d --build`: Rebuilt and restarted all 4 containers (`postgres`, `api`, `caddy`, `backup`).
+- Startup migration: Applied `20260910152826_iso27001_bot_audit_compliance` automatically on API container start.
+- Container Health:
+  - `cloud-team-management-api-1`: Up & healthy
+  - `cloud-team-management-postgres-1`: Up & healthy
+  - `cloud-team-management-caddy-1`: Up (HTTP/2 200, reverse proxy active)
+  - `cloud-team-management-backup-1`: Up
+- Live Endpoints: `https://localhost/api/health` returns HTTP/2 200 `{"ok":true}`.
+
+
