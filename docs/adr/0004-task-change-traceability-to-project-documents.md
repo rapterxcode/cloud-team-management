@@ -1,0 +1,3 @@
+# Explicit foreign key traceability from tasks to CR/CC project documents
+
+Under ISO 27001 (A.12.1.2 Change Management) and Bank of Thailand (BOT) IT Governance standards, production deployment and maintenance changes must provide unambiguous traceability to authorized Change Request (CR) and Change Control (CC) records. Instead of relying on unstructured text mentions in task descriptions, we establish a nullable foreign key reference from `Task` to `ProjectDocument`. This allows engineers to bind deployment tasks directly to signed-off change approvals, gives auditors immediate one-click verification from task inspection views, and guarantees referential integrity at the database layer.

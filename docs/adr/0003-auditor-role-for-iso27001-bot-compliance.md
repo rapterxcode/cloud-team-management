@@ -1,0 +1,3 @@
+# Introduce read-only auditor role for ISO 27001 and BOT segregation of duties
+
+The platform previously maintained only `admin` and `member` roles, both having write and delete permissions across projects, tasks, and documents. To comply with ISO 27001 (A.9 Access Control) and Bank of Thailand (BOT) regulatory standards, internal and external compliance auditors require inspection access without permission to alter or delete audit evidence. We introduce an explicit `auditor` role granting read-only access across dashboards, projects, tasks, knowledge articles, and project documents (including in-browser viewing and file downloading), with server-side mutation guards that strictly reject create, update, and delete requests.

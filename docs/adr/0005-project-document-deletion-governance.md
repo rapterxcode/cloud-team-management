@@ -1,0 +1,3 @@
+# Restrict project document deletion to uploaders and admins
+
+To protect compliance evidence under ISO 27001 and Bank of Thailand (BOT) audit requirements without imposing high administrative overhead on mundane mistakes, we enforce ownership-scoped deletion. An uploaded `ProjectDocument` can be deleted only by the User who uploaded it (`uploadedById === req.session.userId`) or an `admin`. The `auditor` role is strictly blocked from file deletion. Other `member` users cannot delete evidence uploaded by their peers. This guarantees that compliance records cannot be wiped by unauthorized team members while preserving developer self-service for correcting mistaken uploads.
