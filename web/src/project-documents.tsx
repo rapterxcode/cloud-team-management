@@ -2,12 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   File, FileText, Image as ImageIcon, Code, Archive, 
   Trash2, Download, Eye, FileSpreadsheet, 
-  Upload, ExternalLink, Search, Loader2, AlertCircle
+  Upload, ExternalLink, Search, Loader2, AlertCircle,
+  Maximize2, Minimize2
 } from 'lucide-react';
 import { Button } from './components/ui/button';
 import { Badge } from './components/ui/badge';
 import { Card, CardContent } from './components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './components/ui/dialog';
+import { cn } from './lib/utils';
 import { Input } from './components/ui/input';
 import { Label } from './components/ui/label';
 import { parseCSV } from './lib/csv.mjs';
@@ -140,6 +142,7 @@ export default function ProjectDocuments({ projectId, currentUser }: ProjectDocu
   const [sheetLoading, setSheetLoading] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
   const [sheetSearch, setSheetSearch] = useState('');
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const fetchDocuments = async () => {
     try {
@@ -448,8 +451,8 @@ export default function ProjectDocuments({ projectId, currentUser }: ProjectDocu
         )}
       </div>
 
-      <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
-        <DialogContent className="max-w-6xl w-full h-[90vh] flex flex-col p-0 gap-0 overflow-hidden shadow-2xl border-slate-200 dark:border-slate-800">
+      <Dialog open={!!previewDoc} onOpenChange={(open) => { if (!open) { setPreviewDoc(null); setIsMaximized(false); } }}>
+        <DialogContent className={cn("document-preview-dialog flex flex-col p-0 gap-0 overflow-hidden shadow-2xl border-slate-200 dark:border-slate-800 transition-all duration-150", isMaximized && "is-maximized")}>
           <DialogHeader className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 flex flex-row items-center justify-between gap-4 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
@@ -482,6 +485,16 @@ export default function ProjectDocuments({ projectId, currentUser }: ProjectDocu
             <div className="flex items-center gap-2 shrink-0 pr-8">
               {previewDoc && (
                 <>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 gap-1.5 text-xs font-normal" 
+                    onClick={() => setIsMaximized(!isMaximized)}
+                    title={isMaximized ? "Restore size" : "Maximize view"}
+                  >
+                    {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                    <span className="hidden sm:inline">{isMaximized ? "Restore" : "Maximize"}</span>
+                  </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
