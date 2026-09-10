@@ -73,3 +73,38 @@ test('GET /api/copilot/status reflects env key', async () => {
   await close();
   if (prev !== undefined) process.env.GEMINI_API_KEY = prev;
 });
+
+test('POST /api/copilot returns draftTask with resolved project and owner IDs', async () => {
+  const fake: AskLLM = async () => ({
+    answer: 'I have drafted a task for Sam.',
+    draftTask: {
+      name: 'Upgrade Redis cluster',
+      projectName: 'Platform Modern',
+      ownerName: 'Sam Ops',
+      priority: 'High',
+      phase: 'Development',
+      date: '2026-09-30',
+      description: 'Run deployment checklist',
+    },
+  });
+  const { base, close } = await makeServer({ askLLM: fake });
+  const sam = await createUser('sam@team.test', 'pw123456', 'member', { name: 'Sam Ops' });
+  const proj = await prisma.project.create({ data: { name: 'Platform Modernization' } });
+  const { cookie } = await login(base, 'sam@team.test', 'pw123456');
+
+  const res = await fetch(base + '/api/copilot', authed(cookie, 'POST', { question: 'Create a task for Sam to upgrade Redis' }));
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.answer, 'I have drafted a task for Sam.');
+  assert.ok(data.draftTask);
+  assert.equal(data.draftTask.name, 'Upgrade Redis cluster');
+  assert.equal(data.draftTask.projectId, proj.id);
+  assert.equal(data.draftTask.projectName, 'Platform Modernization');
+  assert.equal(data.draftTask.ownerId, sam.id);
+  assert.equal(data.draftTask.ownerName, 'Sam Ops');
+  assert.equal(data.draftTask.priority, 'High');
+  assert.equal(data.draftTask.phase, 'Development');
+  assert.equal(data.draftTask.date, '2026-09-30');
+  assert.equal(data.draftTask.description, 'Run deployment checklist');
+  await close();
+});
