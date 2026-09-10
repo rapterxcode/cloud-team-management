@@ -33,6 +33,16 @@ export function projectDocumentsRoutes(prisma: PrismaClient) {
   
   const upload = makeUpload();
 
+  r.get('/project-documents', async (_req, res) => {
+    const documents = await prisma.projectDocument.findMany({
+      orderBy: { createdAt: 'asc' },
+      include: {
+        uploadedBy: { select: { id: true, name: true } }
+      }
+    });
+    res.json(documents);
+  });
+
   r.get('/projects/:id/documents', async (req, res) => {
     const { category } = req.query;
     const documents = await prisma.projectDocument.findMany({

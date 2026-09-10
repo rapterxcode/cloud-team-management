@@ -1,5 +1,5 @@
 import {useState,useEffect} from 'react';
-import {Cloud,LayoutDashboard,FolderKanban,ListTodo,Users,Server,ChartNoAxesCombined,ArrowUpRight,ArrowRight,Plus,Search,Check,Activity,ChevronDown,Clock,Layers,BookOpen,FileText,Pencil,Shield,LogOut,Sparkles} from 'lucide-react';
+import {Cloud,LayoutDashboard,FolderKanban,ListTodo,Users,Server,ChartNoAxesCombined,ArrowUpRight,ArrowRight,Plus,Search,Check,Activity,ChevronDown,Clock,Layers,BookOpen,FileText,Pencil,Shield,LogOut,Sparkles,ShieldCheck,ShieldAlert} from 'lucide-react';
 import {SidebarProvider,Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarTrigger} from '@/components/ui/sidebar';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {NativeSelect,NativeSelectOption} from '@/components/ui/native-select';
@@ -16,12 +16,16 @@ import ArticleAttachments from './attachments';
 import CopilotPanel from './copilot';
 import TaskDrawer from './task-drawer';
 import MarkdownViewer from './markdown-viewer';
-const nav=[['Overview',LayoutDashboard],['Projects',FolderKanban],['Tasks',ListTodo],['Knowledge',BookOpen],['Team',Users],['Cloud resources',Server],['Reports',ChartNoAxesCombined]] as const;
+import ProjectDocuments from './project-documents';
+import { ComplianceMatrix } from './compliance-matrix';
+const nav=[['Overview',LayoutDashboard],['Projects',FolderKanban],['Tasks',ListTodo],['Knowledge',BookOpen],['Compliance matrix',ShieldCheck],['Team',Users],['Cloud resources',Server],['Reports',ChartNoAxesCombined]] as const;
 const initials=(name:string)=>name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 export default function Home(){
  const [me,setMe]=useState<Me|null|undefined>(undefined);
  const [users,setUsers]=useState<User[]>([]);
  const [view,setView]=useState('Overview'),[projects,setProjects]=useState<Project[]>([]),[tasks,setTasks]=useState<Task[]>([]),[query,setQuery]=useState(''),[filter,setFilter]=useState('All'),[modal,setModal]=useState(''),[detail,setDetail]=useState<Project|null>(null),[notice,setNotice]=useState('');
+ const [projectTab,setProjectTab]=useState<'tasks'|'documents'>('tasks');
+ const [projectDocuments,setProjectDocuments]=useState<any[]>([]);
  const [formError,setFormError]=useState('');
  const [copilotOpen,setCopilotOpen]=useState(false);
  const [copilotInitialPrompt,setCopilotInitialPrompt]=useState('');
@@ -31,7 +35,7 @@ export default function Home(){
  const [articleBody,setArticleBody]=useState('');
  const [resourceRows,setResourceRows]=useState<Resource[]>([]);
  const [editingProject,setEditingProject]=useState<Project|null>(null),[editingResource,setEditingResource]=useState<Resource|null>(null);
- const loadAll=async()=>{const [p,t,k,r,u]=await Promise.all([api<Project[]>('/projects'),api<ApiTask[]>('/tasks'),api<Article[]>('/knowledge'),api<Resource[]>('/resources'),api<User[]>('/users')]);setProjects(p);setTasks(t.map(withDue));setKnowledge(k);setResourceRows(r);setUsers(u);};
+ const loadAll=async()=>{const [p,t,k,r,u,docs]=await Promise.all([api<Project[]>('/projects'),api<ApiTask[]>('/tasks'),api<Article[]>('/knowledge'),api<Resource[]>('/resources'),api<User[]>('/users'),api<any[]>('/project-documents').catch(()=>[])]);setProjects(p);setTasks(t.map(withDue));setKnowledge(k);setResourceRows(r);setUsers(u);setProjectDocuments(docs);};
  useEffect(()=>{api<Me>('/auth/me').then(m=>{setMe(m);return loadAll();}).catch(()=>setMe(null));},[]);
  const navigate=(name:string)=>{setView(name);setQuery('');setFilter('All');};
  useEffect(()=>{

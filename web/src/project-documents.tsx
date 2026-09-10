@@ -27,18 +27,28 @@ interface Document {
   uploadedByName: string;
 }
 
+export const CATEGORY_MAP: Record<string, string> = {
+  CR: 'Change Request (CR)',
+  CC: 'Change Control (CC)',
+  CRA: 'Cloud Risk Assessment',
+  Diagram: 'Architecture Diagram',
+  RBAC: 'RBAC Matrix',
+  TestEvidence: 'Test Evidence',
+  General: 'General',
+};
+
 const CATEGORIES = [
-  'All',
-  'Change Request (CR)',
-  'Change Control (CC)',
-  'Cloud Risk Assessment',
-  'Architecture Diagram',
-  'RBAC Matrix',
-  'Test Evidence',
-  'General'
+  { key: 'All', label: 'All' },
+  { key: 'CR', label: 'Change Request (CR)' },
+  { key: 'CC', label: 'Change Control (CC)' },
+  { key: 'CRA', label: 'Cloud Risk Assessment' },
+  { key: 'Diagram', label: 'Architecture Diagram' },
+  { key: 'RBAC', label: 'RBAC Matrix' },
+  { key: 'TestEvidence', label: 'Test Evidence' },
+  { key: 'General', label: 'General' },
 ];
 
-const UPLOAD_CATEGORIES = CATEGORIES.filter(c => c !== 'All');
+const UPLOAD_CATEGORIES = CATEGORIES.filter(c => c.key !== 'All');
 
 const formatBytes = (bytes: number) => {
   if (bytes === 0) return '0 Bytes';
@@ -71,11 +81,17 @@ const getFileIcon = (filename: string) => {
 
 const getCategoryColor = (category: string) => {
   switch (category) {
+    case 'CR':
     case 'Change Request (CR)': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:bg-blue-200';
+    case 'CC':
     case 'Change Control (CC)': return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 hover:bg-indigo-200';
+    case 'CRA':
     case 'Cloud Risk Assessment': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:bg-orange-200';
+    case 'Diagram':
     case 'Architecture Diagram': return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 hover:bg-purple-200';
+    case 'RBAC':
     case 'RBAC Matrix': return 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200 hover:bg-pink-200';
+    case 'TestEvidence':
     case 'Test Evidence': return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 hover:bg-emerald-200';
     default: return 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 hover:bg-slate-200';
   }
@@ -88,7 +104,7 @@ export default function ProjectDocuments({ projectId, currentUser }: ProjectDocu
   // Upload state
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadCategory, setUploadCategory] = useState(UPLOAD_CATEGORIES[0]);
+  const [uploadCategory, setUploadCategory] = useState(UPLOAD_CATEGORIES[0].key);
   const [uploadRef, setUploadRef] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   
@@ -100,7 +116,17 @@ export default function ProjectDocuments({ projectId, currentUser }: ProjectDocu
       const res = await fetch(`/api/projects/${projectId}/documents`);
       if (res.ok) {
         const data = await res.json();
-        setDocuments(data);
+        const mapped = data.map((d: any) => ({
+          id: d.id,
+          name: d.originalName || d.name,
+          size: d.sizeBytes ?? d.size ?? 0,
+          category: d.category,
+          referenceNo: d.referenceNo,
+          uploadDate: d.createdAt || d.uploadDate || new Date().toISOString(),
+          uploadedById: d.uploadedById,
+          uploadedByName: d.uploadedBy?.name || d.uploadedByName || 'Team member',
+        }));
+        setDocuments(mapped);
       }
     } catch (e) {
       console.error('Failed to fetch documents', e);
@@ -169,15 +195,15 @@ export default function ProjectDocuments({ projectId, currentUser }: ProjectDocu
         <div className="flex gap-2 overflow-x-auto pb-2 w-full sm:w-auto scrollbar-hide">
           {CATEGORIES.map(cat => (
             <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
+              key={cat.key}
+              onClick={() => setActiveCategory(cat.key)}
               className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors
-                ${activeCategory === cat 
+                ${activeCategory === cat.key 
                   ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900' 
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                 }`}
             >
-              {cat}
+              {cat.label}
             </button>
           ))}
         </div>
@@ -213,7 +239,7 @@ export default function ProjectDocuments({ projectId, currentUser }: ProjectDocu
                     onChange={e => setUploadCategory(e.target.value)}
                   >
                     {UPLOAD_CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
+                      <option key={cat.key} value={cat.key}>{cat.label}</option>
                     ))}
                   </select>
                 </div>
@@ -258,7 +284,7 @@ export default function ProjectDocuments({ projectId, currentUser }: ProjectDocu
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge variant="secondary" className={`text-[10px] font-medium border-transparent ${getCategoryColor(doc.category)}`}>
-                      {doc.category}
+                      {CATEGORY_MAP[doc.category] || doc.category}
                     </Badge>
                     {doc.referenceNo && (
                       <Badge variant="outline" className="text-[10px] font-medium border-slate-200 dark:border-slate-700">

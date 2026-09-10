@@ -3,7 +3,11 @@ import type { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware.js';
 import { assertIn, badRequest, PHASES, PRIORITIES, TASK_STATUSES, validateDates } from '../validate.js';
 
-const OWNER = { owner: { select: { id: true, name: true } } };
+const TASK_INCLUDE = {
+  owner: { select: { id: true, name: true } },
+  changeDocument: { select: { id: true, originalName: true, category: true, referenceNo: true } },
+  sopArticle: { select: { id: true, name: true, category: true } }
+};
 
 export function tasksRoutes(prisma: PrismaClient) {
   const r = Router();
@@ -15,12 +19,12 @@ export function tasksRoutes(prisma: PrismaClient) {
   }
 
   r.get('/', async (_req, res) => {
-    res.json(await prisma.task.findMany({ include: OWNER, orderBy: { createdAt: 'asc' } }));
+    res.json(await prisma.task.findMany({ include: TASK_INCLUDE, orderBy: { createdAt: 'asc' } }));
   });
 
   r.post('/', async (req, res, next) => {
     try {
-      const { projectId, name, ownerId, phase = 'Planning', priority = 'Medium', start = '', date = '', description = '' } = req.body ?? {};
+      const { projectId, name, ownerId, phase = 'Planning', priority = 'Medium', start = '', date = '', description = '', sopArticleId, changeDocumentId } = req.body ?? {};
       const trimmed = String(name ?? '').trim();
       if (!trimmed) throw badRequest('A name is required');
       if (description !== undefined && String(description).length > 10000)
@@ -32,8 +36,8 @@ export function tasksRoutes(prisma: PrismaClient) {
       assertIn(priority, PRIORITIES, 'Priority');
       validateDates(String(start), String(date));
       const t = await prisma.task.create({
-        data: { projectId, name: trimmed, ownerId, phase, priority, start: String(start), date: String(date), description: String(description) },
-        include: OWNER,
+        data: { projectId, name: trimmed, ownerId, phase, priority, start: String(start), date: String(date), description: String(description), ...(sopArticleId ? { sopArticleId: String(sopArticleId) } : {}), ...(changeDocumentId ? { changeDocumentId: String(changeDocumentId) } : {}) },
+        include: TASK_INCLUDE,
       });
       res.status(201).json(t);
     } catch (e) { next(e); }
@@ -43,7 +47,7 @@ export function tasksRoutes(prisma: PrismaClient) {
     try {
       const existing = await prisma.task.findUnique({ where: { id: req.params.id } });
       if (!existing) return res.status(404).json({ error: 'Task not found' });
-      const { name, ownerId, phase, status, priority, start, date, description } = req.body ?? {};
+      const { name, ownerId, phase, status, priority, start, date, description, sopArticleId, changeDocumentId } = req.body ?? {};
       if (name !== undefined && !String(name).trim()) throw badRequest('A name is required');
       if (description !== undefined && String(description).length > 10000)
         throw badRequest('Description cannot exceed 10000 characters');
@@ -65,8 +69,10 @@ export function tasksRoutes(prisma: PrismaClient) {
           ...(start !== undefined ? { start: nextStart } : {}),
           ...(date !== undefined ? { date: nextDate } : {}),
           ...(description !== undefined ? { description: String(description) } : {}),
+          ...(sopArticleId !== undefined ? { sopArticleId: sopArticleId ? String(sopArticleId) : null } : {}),
+          ...(changeDocumentId !== undefined ? { changeDocumentId: changeDocumentId ? String(changeDocumentId) : null } : {}),
         },
-        include: OWNER,
+        include: TASK_INCLUDE,
       });
       res.json(t);
     } catch (e) { next(e); }

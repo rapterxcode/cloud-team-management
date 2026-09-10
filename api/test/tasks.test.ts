@@ -118,3 +118,43 @@ test('task priority can be set on creation and rejects invalid priority', async 
   await close();
 });
 
+test('task creation and patch handles sopArticleId and changeDocumentId', async () => {
+  const { base, close } = await makeServer();
+  const { member, cookie, project } = await setup(base);
+
+  const article = await prisma.knowledgeArticle.create({
+    data: { name: 'SOP 1', category: 'Runbooks', body: 'steps', authorId: member.id, projectId: project.id }
+  });
+
+  const doc = await prisma.projectDocument.create({
+    data: { 
+      projectId: project.id, 
+      storedName: 'doc_123', 
+      originalName: 'cr.pdf', 
+      mimeType: 'application/pdf', 
+      sizeBytes: 100, 
+      category: 'CR', 
+      uploadedById: member.id 
+    }
+  });
+
+  const created = await fetch(base + '/api/tasks', authed(cookie, 'POST', {
+    projectId: project.id, name: 'Deploy app', ownerId: member.id, sopArticleId: article.id, changeDocumentId: doc.id
+  }));
+  assert.equal(created.status, 201);
+  const t = await created.json();
+  assert.equal(t.sopArticleId, article.id);
+  assert.equal(t.changeDocumentId, doc.id);
+  assert.equal(t.sopArticle.name, 'SOP 1');
+  assert.equal(t.changeDocument.originalName, 'cr.pdf');
+
+  const updated = await fetch(base + `/api/tasks/${t.id}`, authed(cookie, 'PATCH', {
+    sopArticleId: null, changeDocumentId: null
+  }));
+  assert.equal(updated.status, 200);
+  const t2 = await updated.json();
+  assert.equal(t2.sopArticleId, null);
+  assert.equal(t2.changeDocumentId, null);
+
+  await close();
+});

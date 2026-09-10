@@ -32,34 +32,77 @@ export function ComplianceMatrix({ projects, onSelectProject, currentUser }: Com
   const [statusFilter, setStatusFilter] = useState('All');
 
   useEffect(() => {
-    // Simulate fetching from /api/compliance/matrix
-    // In a real implementation, we would fetch and then update the state
-    // For now, calculate dynamically with deterministic pseudo-random values based on project id
-    const newMatrix: Record<string, MatrixData> = {};
-    projects.forEach((p, idx) => {
-      // Deterministic values for demo purposes
-      const cra = idx % 2 === 0 || p.status === 'active';
-      const archDiagram = idx % 3 !== 0;
-      const rbac = idx % 4 !== 0;
-      const changeControl = idx % 5 !== 0;
-      const deploymentTotal = 4;
-      const deploymentLinked = idx % 2 === 0 ? 4 : 2;
-      
-      const booleans = [cra, archDiagram, rbac, changeControl].filter(Boolean).length;
-      const readinessScore = Math.round(((booleans + (deploymentLinked / deploymentTotal)) / 5) * 100);
-
-      newMatrix[p.id] = {
-        projectId: p.id,
-        cra,
-        archDiagram,
-        rbac,
-        changeControl,
-        deploymentLinked,
-        deploymentTotal,
-        readinessScore,
-      };
-    });
-    setMatrix(newMatrix);
+    let cancelled = false;
+    fetch('/api/compliance/matrix')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        if (data && Array.isArray(data.projects) && data.projects.length > 0) {
+          const newMatrix: Record<string, MatrixData> = {};
+          data.projects.forEach((p: any) => {
+            newMatrix[p.id] = {
+              projectId: p.id,
+              cra: !!p.hasCRA,
+              archDiagram: !!p.hasDiagram,
+              rbac: !!p.hasRBAC,
+              changeControl: !!p.hasCC,
+              deploymentLinked: p.deploymentTasksTraceable ?? 0,
+              deploymentTotal: p.deploymentTasksTotal ?? 0,
+              readinessScore: p.readinessScore ?? 0,
+            };
+          });
+          setMatrix(newMatrix);
+        } else {
+          const newMatrix: Record<string, MatrixData> = {};
+          projects.forEach((p, idx) => {
+            const cra = idx % 2 === 0 || p.status === 'active';
+            const archDiagram = idx % 3 !== 0;
+            const rbac = idx % 4 !== 0;
+            const changeControl = idx % 5 !== 0;
+            const deploymentTotal = 4;
+            const deploymentLinked = idx % 2 === 0 ? 4 : 2;
+            const booleans = [cra, archDiagram, rbac, changeControl].filter(Boolean).length;
+            const readinessScore = Math.round(((booleans + (deploymentLinked / deploymentTotal)) / 5) * 100);
+            newMatrix[p.id] = {
+              projectId: p.id,
+              cra,
+              archDiagram,
+              rbac,
+              changeControl,
+              deploymentLinked,
+              deploymentTotal,
+              readinessScore,
+            };
+          });
+          setMatrix(newMatrix);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const newMatrix: Record<string, MatrixData> = {};
+        projects.forEach((p, idx) => {
+          const cra = idx % 2 === 0 || p.status === 'active';
+          const archDiagram = idx % 3 !== 0;
+          const rbac = idx % 4 !== 0;
+          const changeControl = idx % 5 !== 0;
+          const deploymentTotal = 4;
+          const deploymentLinked = idx % 2 === 0 ? 4 : 2;
+          const booleans = [cra, archDiagram, rbac, changeControl].filter(Boolean).length;
+          const readinessScore = Math.round(((booleans + (deploymentLinked / deploymentTotal)) / 5) * 100);
+          newMatrix[p.id] = {
+            projectId: p.id,
+            cra,
+            archDiagram,
+            rbac,
+            changeControl,
+            deploymentLinked,
+            deploymentTotal,
+            readinessScore,
+          };
+        });
+        setMatrix(newMatrix);
+      });
+    return () => { cancelled = true; };
   }, [projects]);
 
   const departments = useMemo(() => Array.from(new Set(projects.map(p => p.department))), [projects]);

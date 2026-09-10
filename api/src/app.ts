@@ -13,6 +13,7 @@ import { attachmentUploadRoutes, attachmentsRoutes } from './routes/attachments.
 import { resourcesRoutes } from './routes/resources.js';
 import { copilotRoutes } from './routes/copilot.js';
 import { projectDocumentsRoutes } from './routes/project-documents.js';
+import { complianceRoutes } from './routes/compliance.js';
 import type { AskLLM } from './copilot/gemini.js';
 
 // One shared pool for the whole process. createApp() is called once per test
@@ -76,6 +77,7 @@ export function createApp(prisma: PrismaClient, opts: { askLLM?: AskLLM } = {}) 
   app.use('/api/knowledge', knowledgeRoutes(prisma));
   app.use('/api/attachments', attachmentsRoutes(prisma));
   app.use('/api', projectDocumentsRoutes(prisma));
+  app.use('/api/compliance', complianceRoutes(prisma));
   app.use('/api/resources', resourcesRoutes(prisma));
   app.use('/api/copilot', copilotRoutes(prisma, opts.askLLM));
   // More routes mounted by later tasks.
