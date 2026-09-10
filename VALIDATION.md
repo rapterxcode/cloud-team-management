@@ -59,3 +59,29 @@ Branch `feat/task-depth-workload`. Task descriptions, shared slide-over TaskDraw
 - Shared slide-over `<TaskDrawer />` mounted in `App.tsx` and triggered on task clicking from Overview ("Your priorities"), Tasks (Kanban cards), and Project workspace (Gantt task rows).
 - Member capacity percentages in Team and Overview derive reactively from in-memory active tasks, updating instantly upon task completion, reassignment, or addition.
 
+---
+
+## Actionable Copilot & Knowledge Hub Markdown — 2026-09-10
+
+Branch `feat/actionable-copilot-knowledge-markdown`. Actionable Copilot (Phase 3) with interactive TaskDraftCard in chat, backend tool calling & entity resolution, Knowledge Hub full Markdown rendering (`react-markdown` + `remark-gfm`), syntax-highlighted code blocks with a one-click copy button, tabbed Write/Preview editor, instant search with term highlighting, and the "✨ Turn into tasks with Copilot" runbook bridge. Spec: `docs/superpowers/specs/2026-09-10-actionable-copilot-knowledge-markdown-design.md`, Plan: `docs/superpowers/plans/2026-09-10-actionable-copilot-knowledge-markdown.md`.
+
+**Backend Enhancements & Tests:**
+- `POST /api/tasks`: Added direct support and validation for `priority` on task creation.
+- `api/src/copilot/gemini.ts`: Defined `draftTask` function declaration tool in `@google/genai` options; typed `TaskDraft`, `CopilotResult`, and backwards-compatible `AskLLM`.
+- `api/src/routes/copilot.ts`: Resolved project name to `projectId` and owner name to active `ownerId` with fallback defaults; returned `{ answer, draftTask }`.
+- Tests: `npm --prefix api test` → **37/37** pass (35 prior + priority creation + draftTask resolution).
+- Build: `npm --prefix api run build` clean (`tsc -p tsconfig.json`).
+
+**Web Enhancements & Tests:**
+- `web/src/markdown-viewer.tsx`: Created GitHub-Flavored Markdown renderer (`react-markdown` + `remark-gfm`) with styled code blocks, language badge, and one-click Copy button.
+- `web/src/lib/search.mjs`: Pure helpers `filterArticles`, `highlightMatches`, and `snippetWithMatch` with full unit test coverage.
+- Tests: `npm --prefix web test` → **14/14** pass (10 prior + 4 search highlighting & snippet centering tests).
+- Build: `npm --prefix web run build` clean (`tsc --noEmit` 0 errors, `vite build` emitted).
+
+**UI Verification:**
+- Interactive `<TaskDraftCard />` renders inside Copilot chat when Gemini proposes a task. User can review/adjust Project, Owner, Priority, Due Date, and click "Create Task" (human-in-the-loop).
+- Knowledge Hub reader renders articles in rich Markdown with code blocks and copy buttons.
+- "✨ Turn into tasks with Copilot" button in article reader converts runbook steps directly into task proposals.
+- Create/Edit article dialog features Write (Markdown) and Preview tabs.
+- Search bar highlights matched terms with `<mark className="search-highlight">` in article card titles and snippets in real-time.
+
