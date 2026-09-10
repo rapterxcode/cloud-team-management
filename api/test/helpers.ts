@@ -18,8 +18,8 @@ export async function resetDb() {
   resetLoginLimiter(); // the limiter Map is process-global; clear it so test order can't leak attempts
 }
 
-export async function makeServer() {
-  const app = createApp(prisma);
+export async function makeServer(opts: { askLLM?: import('../src/copilot/gemini.js').AskLLM } = {}) {
+  const app = createApp(prisma, opts);
   const server = app.listen(0);
   await new Promise((r) => server.once('listening', r));
   const { port } = server.address() as { port: number };

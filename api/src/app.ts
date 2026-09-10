@@ -11,6 +11,8 @@ import { tasksRoutes } from './routes/tasks.js';
 import { knowledgeRoutes } from './routes/knowledge.js';
 import { attachmentUploadRoutes, attachmentsRoutes } from './routes/attachments.js';
 import { resourcesRoutes } from './routes/resources.js';
+import { copilotRoutes } from './routes/copilot.js';
+import type { AskLLM } from './copilot/gemini.js';
 
 // One shared pool for the whole process. createApp() is called once per test
 // server, so a per-call `new pg.Pool` would leak connections and exhaust
@@ -26,7 +28,7 @@ function getSessionPool() {
   return sessionPool;
 }
 
-export function createApp(prisma: PrismaClient) {
+export function createApp(prisma: PrismaClient, opts: { askLLM?: AskLLM } = {}) {
   const app = express();
   app.set('trust proxy', 1);
   app.use(express.json({ limit: '256kb' }));
@@ -68,6 +70,7 @@ export function createApp(prisma: PrismaClient) {
   app.use('/api/knowledge', knowledgeRoutes(prisma));
   app.use('/api/attachments', attachmentsRoutes(prisma));
   app.use('/api/resources', resourcesRoutes(prisma));
+  app.use('/api/copilot', copilotRoutes(prisma, opts.askLLM));
   // More routes mounted by later tasks.
 
   app.use((err: Error & { status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
