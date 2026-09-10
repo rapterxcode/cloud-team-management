@@ -41,3 +41,21 @@ Branch `feat/ai-copilot`. Read-only Q&A grounded in a workspace snapshot, Gemini
 - `docker compose config` valid with the new `GEMINI_API_KEY`/`GEMINI_MODEL` env.
 
 **Not verified (by design):** the live Gemini network path — exercised only with a real key, which is not set. The not-configured (503 / status.enabled=false / panel "isn't configured yet") paths ARE verified. No schema change; no new migration.
+
+---
+
+## Task Operational Depth & Dynamic Workload — 2026-09-10
+
+Branch `feat/task-depth-workload`. Task descriptions, shared slide-over TaskDrawer, and query-time dynamic workload derivation. Spec: `docs/superpowers/specs/2026-09-10-task-depth-dynamic-workload-design.md`, ADR: `docs/adr/0002-dynamic-workload-derivation.md`.
+
+**Database Migration:**
+- `20260910120000_task_description_and_dynamic_workload`: `ALTER TABLE "tasks" ADD COLUMN "description" TEXT NOT NULL DEFAULT ''; ALTER TABLE "users" DROP COLUMN "workload";`. Applied cleanly via `npx prisma migrate deploy`.
+
+**Tests (all green):**
+- api: `npm --prefix api test` → **35/35** pass (33 prior + dynamic workload derivation + task description validation/updating). Covers: dynamic workload derivation from active (non-Done) tasks (20% per task, max 100%, ignores Done tasks); task description create, patch, and length validation (<= 10,000 chars); Copilot snapshot incorporates task description notes and computed workload; `tsc -p tsconfig.json` build clean.
+- web: `npm --prefix web test` → **10/10** pass (9 prior + `computeWorkload` pure helper); `tsc --noEmit` + `vite build` clean (2057 modules, dist emitted).
+
+**UI Verification:**
+- Shared slide-over `<TaskDrawer />` mounted in `App.tsx` and triggered on task clicking from Overview ("Your priorities"), Tasks (Kanban cards), and Project workspace (Gantt task rows).
+- Member capacity percentages in Team and Overview derive reactively from in-memory active tasks, updating instantly upon task completion, reassignment, or addition.
+
