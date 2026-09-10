@@ -20,7 +20,7 @@ export function tasksRoutes(prisma: PrismaClient) {
 
   r.post('/', async (req, res, next) => {
     try {
-      const { projectId, name, ownerId, phase = 'Planning', start = '', date = '', description = '' } = req.body ?? {};
+      const { projectId, name, ownerId, phase = 'Planning', priority = 'Medium', start = '', date = '', description = '' } = req.body ?? {};
       const trimmed = String(name ?? '').trim();
       if (!trimmed) throw badRequest('A name is required');
       if (description !== undefined && String(description).length > 10000)
@@ -29,9 +29,10 @@ export function tasksRoutes(prisma: PrismaClient) {
         throw badRequest('Choose a project');
       await assertActiveOwner(ownerId);
       assertIn(phase, PHASES, 'Phase');
+      assertIn(priority, PRIORITIES, 'Priority');
       validateDates(String(start), String(date));
       const t = await prisma.task.create({
-        data: { projectId, name: trimmed, ownerId, phase, start: String(start), date: String(date), description: String(description) },
+        data: { projectId, name: trimmed, ownerId, phase, priority, start: String(start), date: String(date), description: String(description) },
         include: OWNER,
       });
       res.status(201).json(t);

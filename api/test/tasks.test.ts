@@ -99,3 +99,22 @@ test('task description can be set, updated, and validated for max length', async
   await close();
 });
 
+test('task priority can be set on creation and rejects invalid priority', async () => {
+  const { base, close } = await makeServer();
+  const { member, cookie, project } = await setup(base);
+
+  const created = await fetch(base + '/api/tasks', authed(cookie, 'POST', {
+    projectId: project.id, name: 'Urgent task', ownerId: member.id, priority: 'High',
+  }));
+  assert.equal(created.status, 201);
+  assert.equal((await created.json()).priority, 'High');
+
+  const invalid = await fetch(base + '/api/tasks', authed(cookie, 'POST', {
+    projectId: project.id, name: 'Bad priority', ownerId: member.id, priority: 'Critical',
+  }));
+  assert.equal(invalid.status, 400);
+  assert.match((await invalid.json()).error, /Priority/);
+
+  await close();
+});
+
