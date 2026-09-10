@@ -1,5 +1,5 @@
 const DAY=86400000;
-function day(value){
+export function day(value){
  if(!/^\d{4}-\d{2}-\d{2}/.test(value))throw new Error('Enter a valid date.');
  const datePart=value.slice(0,10);
  const time=Date.parse(datePart+'T00:00:00Z');
@@ -17,4 +17,36 @@ export function schedule(tasks){
  if(!dated.length)return {start:'2026-09-01',days:14,bars:[]};
  const first=Math.min(...dated.map(t=>t.start)),last=Math.max(...dated.map(t=>t.end));
  return {start:new Date(first*DAY).toISOString().slice(0,10),days:last-first+1,bars:dated.map(t=>({id:t.id,offset:t.start-first,duration:t.end-t.start+1}))};
+}
+export function toDateString(dayNumber){
+  return new Date(dayNumber*DAY).toISOString().slice(0,10);
+}
+export function addDays(dateStr,numDays){
+  const currentDay=day(dateStr);
+  return toDateString(currentDay+numDays);
+}
+export function daysDiff(startStr,endStr){
+  return Math.round(day(endStr)-day(startStr));
+}
+export function calculateDragDates(initialStartStr,initialEndStr,mode,deltaDays){
+  const startDay=day(initialStartStr||initialEndStr);
+  const endDay=day(initialEndStr||initialStartStr);
+  if(mode==='move'){
+    const newStartDay=startDay+deltaDays;
+    const newEndDay=endDay+deltaDays;
+    const newStart=toDateString(newStartDay);
+    const newEnd=toDateString(newEndDay);
+    return {start:newStart,date:newEnd,changed:newStart!==initialStartStr||newEnd!==initialEndStr};
+  }
+  if(mode==='resize-start'){
+    const newStartDay=Math.min(startDay+deltaDays,endDay);
+    const newStart=toDateString(newStartDay);
+    return {start:newStart,date:initialEndStr,changed:newStart!==initialStartStr};
+  }
+  if(mode==='resize-end'){
+    const newEndDay=Math.max(endDay+deltaDays,startDay);
+    const newEnd=toDateString(newEndDay);
+    return {start:initialStartStr,date:newEnd,changed:newEnd!==initialEndStr};
+  }
+  return {start:initialStartStr,date:initialEndStr,changed:false};
 }
