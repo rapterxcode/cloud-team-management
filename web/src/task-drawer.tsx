@@ -123,7 +123,7 @@ export default function TaskDrawer({
           <button aria-label="Close" className="text-button" onClick={onClose}><X size={18} /></button>
         </header>
 
-        <form className="task-drawer-form" onSubmit={handleSubmit}>
+        <form key={`${task.id}:${task.start || ''}:${task.date || ''}:${task.status}:${task.phase}:${task.priority}:${task.ownerId}`} className="task-drawer-form" onSubmit={handleSubmit}>
           <div className="task-drawer-body">
             {error && <p className="form-error" role="alert">{error}</p>}
 
@@ -180,6 +180,7 @@ export default function TaskDrawer({
                 <input
                   type="date"
                   name="start"
+                  key={`start-${(task.start || '').slice(0, 10)}`}
                   defaultValue={(task.start || '').slice(0, 10)}
                   onClick={(e) => e.currentTarget.showPicker?.()}
                 />
@@ -190,6 +191,7 @@ export default function TaskDrawer({
                 <input
                   type="date"
                   name="date"
+                  key={`date-${(task.date || '').slice(0, 10)}`}
                   defaultValue={(task.date || '').slice(0, 10)}
                   onClick={(e) => e.currentTarget.showPicker?.()}
                 />

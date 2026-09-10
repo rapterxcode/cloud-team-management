@@ -29,24 +29,26 @@ export function daysDiff(startStr,endStr){
   return Math.round(day(endStr)-day(startStr));
 }
 export function calculateDragDates(initialStartStr,initialEndStr,mode,deltaDays){
-  const startDay=day(initialStartStr||initialEndStr);
-  const endDay=day(initialEndStr||initialStartStr);
+  const cleanStart=(initialStartStr||initialEndStr||'').slice(0,10);
+  const cleanEnd=(initialEndStr||initialStartStr||'').slice(0,10);
+  const startDay=day(cleanStart);
+  const endDay=day(cleanEnd);
   if(mode==='move'){
     const newStartDay=startDay+deltaDays;
     const newEndDay=endDay+deltaDays;
     const newStart=toDateString(newStartDay);
     const newEnd=toDateString(newEndDay);
-    return {start:newStart,date:newEnd,changed:newStart!==initialStartStr||newEnd!==initialEndStr};
+    return {start:newStart,date:newEnd,changed:newStart!==cleanStart||newEnd!==cleanEnd};
   }
   if(mode==='resize-start'){
     const newStartDay=Math.min(startDay+deltaDays,endDay);
     const newStart=toDateString(newStartDay);
-    return {start:newStart,date:initialEndStr,changed:newStart!==initialStartStr};
+    return {start:newStart,date:cleanEnd,changed:newStart!==cleanStart};
   }
   if(mode==='resize-end'){
     const newEndDay=Math.max(endDay+deltaDays,startDay);
     const newEnd=toDateString(newEndDay);
-    return {start:initialStartStr,date:newEnd,changed:newEnd!==initialEndStr};
+    return {start:cleanStart,date:newEnd,changed:newEnd!==cleanEnd};
   }
-  return {start:initialStartStr,date:initialEndStr,changed:false};
+  return {start:cleanStart,date:cleanEnd,changed:false};
 }
