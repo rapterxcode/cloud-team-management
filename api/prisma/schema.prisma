@@ -33,6 +33,7 @@ model Project {
   department  String   @default("Platform")
   due         String   @default("Not set")
   color       String   @default("purple")
+  year        Int      @default(2026)
   createdAt   DateTime @default(now()) @map("created_at")
   tasks       Task[]
   articles    KnowledgeArticle[]

@@ -1,4 +1,4 @@
-export const PROJECT_STATUSES = ['On track', 'At risk'];
+export const PROJECT_STATUSES = ['New', 'On track', 'At risk', 'Completed'];
 export const PHASES = ['Planning', 'Development', 'Launch'];
 export const TASK_STATUSES = ['To do', 'In progress', 'Done'];
 export const PRIORITIES = ['High', 'Medium', 'Low'];

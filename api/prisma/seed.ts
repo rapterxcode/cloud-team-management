@@ -35,9 +35,11 @@ export async function seed(prisma: PrismaClient) {
 
   if ((await prisma.project.count()) === 0) {
     const projects = [
-      { name: 'Cloud infrastructure migration', description: 'A stronger foundation for what’s next.', status: 'On track', progress: 72, department: 'Platform', due: 'Sep 18', color: 'purple' },
-      { name: 'Developer experience', description: 'Making every deployment feel effortless.', status: 'On track', progress: 48, department: 'Engineering', due: 'Sep 24', color: 'blue' },
-      { name: 'Observability rollout', description: 'Clarity across every service and signal.', status: 'At risk', progress: 35, department: 'DevOps', due: 'Sep 12', color: 'orange' },
+      { name: 'Data Center Consolidation & Hybrid Cloud Setup 2025', description: 'Migrated 40+ legacy on-prem workloads to AWS & GCP hybrid network.', status: 'Completed', progress: 100, department: 'Infrastructure', due: 'Dec 2025', color: 'purple', year: 2025 },
+      { name: 'Cloud infrastructure migration', description: 'A stronger foundation for what’s next.', status: 'On track', progress: 72, department: 'Platform', due: 'Sep 18', color: 'purple', year: 2026 },
+      { name: 'Developer experience', description: 'Making every deployment feel effortless.', status: 'On track', progress: 48, department: 'Engineering', due: 'Sep 24', color: 'blue', year: 2026 },
+      { name: 'Observability rollout', description: 'Clarity across every service and signal.', status: 'At risk', progress: 35, department: 'DevOps', due: 'Sep 12', color: 'orange', year: 2026 },
+      { name: 'AI-Powered Fraud Detection & Multi-Region Resiliency 2027', description: 'Next-gen real-time fraud scoring and cross-region active-active failover.', status: 'New', progress: 0, department: 'Security & AI', due: 'Q2 2027', color: 'blue', year: 2027 },
     ];
     const ids: string[] = [];
     for (const p of projects) ids.push((await prisma.project.create({ data: p })).id);

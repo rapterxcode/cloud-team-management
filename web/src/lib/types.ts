@@ -1,6 +1,6 @@
 export type Me = { id: string; email: string; name: string; title: string; role: 'admin' | 'member' | 'auditor'; workload: number };
 export type User = { id: string; name: string; title: string; role: 'admin' | 'member' | 'auditor'; isActive: boolean; workload: number };
-export type Project = { id: string; name: string; description: string; status: string; progress: number; department: string; due: string; color: string };
+export type Project = { id: string; name: string; description: string; status: string; progress: number; department: string; due: string; color: string; year: number; createdAt?: string };
 export type ApiTask = { id: string; projectId: string; name: string; description: string; ownerId: string; owner: { id: string; name: string }; phase: string; status: string; priority: string; start: string; date: string; sopArticleId?: string | null; changeDocumentId?: string | null; changeDocument?: { id: string; originalName: string; category: string; referenceNo: string } | null; sopArticle?: { id: string; name: string; category: string } | null };
 export type Task = ApiTask & { due: string; ownerName: string };
 export type Attachment = { id: string; originalName: string; sizeBytes: number };
