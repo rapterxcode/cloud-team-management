@@ -43,6 +43,9 @@ Monorepo, two packages behind one Caddy ingress. Full spec:
   passwords (`src/passwords.ts`, no argon2). Tests hit a real Postgres via
   `fetch`; no mocks. The test script uses `--test-force-exit --test-concurrency=1`
   (pg pool keeps the loop alive; files share one DB).
+  - Copilot: `src/copilot/` (snapshot + Gemini behind `AskLLM`), routes in
+    `src/routes/copilot.ts`; read-only, off unless `GEMINI_API_KEY` is set;
+    tests inject a fake `askLLM` (no key needed).
 - **Deploy** — `caddy/Dockerfile` builds the SPA into the Caddy image (no web
   runtime container); Caddy serves it and proxies `/api/*`. `api` runs
   `prisma migrate deploy` + idempotent seed on start. `backup` dumps nightly

@@ -28,3 +28,16 @@ Branch `feat/platform-migration`. Vinext/Cloudflare → Vite SPA + Express/Prism
 - **Restore rehearsed** (docs/DEPLOY.md runbook): `pg_restore` into scratch `ctm_restore` → counts matched live (projects 3, tasks 4, users 5); attachments tar valid.
 
 **Notes:** the Secure cookie means the app requires HTTPS in production (plain-HTTP trial won't keep a session — expected). Real production bug fixed during build: login now `req.session.save()`s before responding (durability race). No email service (ADR-0001).
+
+---
+
+## AI Copilot (phase 2) — 2026-09-10
+
+Branch `feat/ai-copilot`. Read-only Q&A grounded in a workspace snapshot, Gemini behind an injectable `askLLM`. Spec: `docs/superpowers/specs/2026-09-10-ai-copilot-design.md`.
+
+**Tests (all green, no API key needed — a fake `askLLM` is injected):**
+- api: `npm --prefix api test` → **33/33** pass (23 prior + 3 snapshot + 2 gemini + 5 route). Covers: snapshot includes workspace facts and excludes password hashes/emails + is size-bounded/truncated; `isConfigured()`/`realAskLLM` graceful when no key; route requires auth (401), passes snapshot+question to the LLM and returns `{answer}`, rejects empty/oversized question (400), maps provider error→502 and not-configured→503, `GET /status` reflects env key. `tsc -p` build clean.
+- web: `npm --prefix web test` → 9/9; `tsc --noEmit` + `vite build` clean (2056 modules).
+- `docker compose config` valid with the new `GEMINI_API_KEY`/`GEMINI_MODEL` env.
+
+**Not verified (by design):** the live Gemini network path — exercised only with a real key, which is not set. The not-configured (503 / status.enabled=false / panel "isn't configured yet") paths ARE verified. No schema change; no new migration.

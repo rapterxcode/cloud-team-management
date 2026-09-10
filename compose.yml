@@ -21,6 +21,8 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ATTACHMENTS_DIR: /attachments
       NODE_ENV: production
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
     volumes:
       - attachments:/attachments
     healthcheck:

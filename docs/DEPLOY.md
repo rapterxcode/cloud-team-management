@@ -67,6 +67,14 @@ Replace `2026-09-09` with the backup date you are restoring.
    docker compose exec postgres dropdb -U postgres ctm_old
    ```
 
+## AI Copilot (optional)
+Set `GEMINI_API_KEY` in `.env` (and optionally `GEMINI_MODEL`, default
+`gemini-2.5-flash`) to enable the Copilot. When a question is asked, the backend
+sends a compact snapshot of workspace data (projects, tasks, team, resources,
+and truncated knowledge previews — never passwords, emails, or secrets) plus the
+question to Google's Gemini API. Leave the key blank to keep the Copilot
+disabled; the rest of the app is unaffected.
+
 ## Password resets
 There is no email-based reset (see `docs/adr/0001`). An admin resets passwords
 from the **Admin** view (or via `PATCH /api/users/:id`).
