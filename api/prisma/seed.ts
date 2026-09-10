@@ -3,10 +3,10 @@ import { randomUUID } from 'node:crypto';
 import { hashPassword } from '../src/passwords.js';
 
 const DEMO_USERS = [
-  { email: 'alex.morgan@demo.local', name: 'Alex Morgan', title: 'Platform Lead', workload: 78 },
-  { email: 'sarah.chen@demo.local', name: 'Sarah Chen', title: 'Cloud Engineer', workload: 64 },
-  { email: 'james.wilson@demo.local', name: 'James Wilson', title: 'DevOps Engineer', workload: 91 },
-  { email: 'priya.patel@demo.local', name: 'Priya Patel', title: 'SRE', workload: 56 },
+  { email: 'alex.morgan@demo.local', name: 'Alex Morgan', title: 'Platform Lead' },
+  { email: 'sarah.chen@demo.local', name: 'Sarah Chen', title: 'Cloud Engineer' },
+  { email: 'james.wilson@demo.local', name: 'James Wilson', title: 'DevOps Engineer' },
+  { email: 'priya.patel@demo.local', name: 'Priya Patel', title: 'SRE' },
 ];
 
 export async function seed(prisma: PrismaClient) {
@@ -41,10 +41,10 @@ export async function seed(prisma: PrismaClient) {
     for (const p of projects) ids.push((await prisma.project.create({ data: p })).id);
     await prisma.task.createMany({
       data: [
-        { projectId: ids[0], start: '2026-09-01', phase: 'Planning', date: '2026-09-07', name: 'Review production deployment pipeline', status: 'In progress', priority: 'High', ownerId: users['Alex Morgan'] },
-        { projectId: ids[0], start: '2026-09-08', phase: 'Development', date: '2026-09-12', name: 'Configure staging environment', status: 'To do', priority: 'Medium', ownerId: users['Sarah Chen'] },
-        { projectId: ids[1], start: '2026-09-03', phase: 'Development', date: '2026-09-10', name: 'Update infrastructure documentation', status: 'In progress', priority: 'Medium', ownerId: users['James Wilson'] },
-        { projectId: ids[2], start: '2026-09-05', phase: 'Planning', date: '2026-09-12', name: 'Audit unused cloud resources', status: 'To do', priority: 'High', ownerId: users['Priya Patel'] },
+        { projectId: ids[0], start: '2026-09-01', phase: 'Planning', date: '2026-09-07', name: 'Review production deployment pipeline', description: 'Verify GitHub Actions workflows, staging deployment steps, and rollback flags before cutting the production release.', status: 'In progress', priority: 'High', ownerId: users['Alex Morgan'] },
+        { projectId: ids[0], start: '2026-09-08', phase: 'Development', date: '2026-09-12', name: 'Configure staging environment', description: 'Provision compute and database instances in the staging VPC matching production network topology.', status: 'To do', priority: 'Medium', ownerId: users['Sarah Chen'] },
+        { projectId: ids[1], start: '2026-09-03', phase: 'Development', date: '2026-09-10', name: 'Update infrastructure documentation', description: 'Document cluster topology, ingress setup, and deployment runbooks in the Knowledge Hub.', status: 'In progress', priority: 'Medium', ownerId: users['James Wilson'] },
+        { projectId: ids[2], start: '2026-09-05', phase: 'Planning', date: '2026-09-12', name: 'Audit unused cloud resources', description: 'Scan idle instances, unattached disks, and unreferenced buckets across AWS and GCP accounts.', status: 'To do', priority: 'High', ownerId: users['Priya Patel'] },
       ],
     });
   }
