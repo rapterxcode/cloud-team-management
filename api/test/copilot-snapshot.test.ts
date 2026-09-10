@@ -13,7 +13,7 @@ test('empty workspace still produces a usable snapshot', async () => {
 });
 
 test('snapshot includes workspace facts and never leaks secrets', async () => {
-  const u = await prisma.user.create({ data: { email: 'sec@team.test', name: 'Sam Ops', passwordHash: 'scrypt:dead:beef', title: 'SRE', workload: 40 } });
+  const u = await prisma.user.create({ data: { email: 'sec@team.test', name: 'Sam Ops', passwordHash: 'scrypt:dead:beef', title: 'SRE' } });
   const p = await prisma.project.create({ data: { name: 'Migration', department: 'Platform', status: 'At risk', progress: 30 } });
   await prisma.task.create({ data: { projectId: p.id, name: 'Cut over DB', ownerId: u.id, status: 'In progress', priority: 'High', date: '2026-09-20' } });
   await prisma.cloudResource.create({ data: { name: 'prod-api', provider: 'AWS', type: 'Compute', status: 'Healthy', monthlyCost: 842 } });

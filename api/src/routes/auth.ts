@@ -29,7 +29,8 @@ export function authRoutes(prisma: PrismaClient) {
   r.get('/me', requireAuth, async (req, res) => {
     const u = await prisma.user.findUnique({ where: { id: req.session.userId! } });
     if (!u || !u.isActive) return res.status(401).json({ error: 'Sign in required' });
-    res.json({ id: u.id, email: u.email, name: u.name, title: u.title, role: u.role, workload: u.workload });
+    const count = await prisma.task.count({ where: { ownerId: u.id, status: { not: 'Done' } } });
+    res.json({ id: u.id, email: u.email, name: u.name, title: u.title, role: u.role, workload: Math.min(100, count * 20) });
   });
 
   return r;

@@ -65,3 +65,48 @@ test('the last active admin cannot deactivate or demote themselves; short passwo
   assert.equal(ok.status, 200);
   await close();
 });
+
+test('GET /users derives workload from active tasks (20% per task, max 100%, ignores Done)', async () => {
+  const { base, close } = await makeServer();
+  await createUser('admin@team.test', 'pw123456', 'admin');
+  const member = await createUser('member@team.test', 'pw123456', 'member');
+  const { cookie } = await login(base, 'member@team.test', 'pw123456');
+
+  // Initially 0 tasks => workload 0
+  let res = await fetch(base + '/api/users', authed(cookie));
+  let users = await res.json();
+  let m = users.find((u: any) => u.id === member.id);
+  assert.equal(m.workload, 0);
+
+  const project = await prisma.project.create({ data: { name: 'P' } });
+  // Add 2 active tasks for member
+  await prisma.task.create({ data: { projectId: project.id, name: 'T1', ownerId: member.id, status: 'To do' } });
+  await prisma.task.create({ data: { projectId: project.id, name: 'T2', ownerId: member.id, status: 'In progress' } });
+
+  res = await fetch(base + '/api/users', authed(cookie));
+  users = await res.json();
+  m = users.find((u: any) => u.id === member.id);
+  assert.equal(m.workload, 40);
+
+  // Complete one task => drops to 20
+  const t1 = await prisma.task.findFirst({ where: { name: 'T1' } });
+  await prisma.task.update({ where: { id: t1!.id }, data: { status: 'Done' } });
+
+  res = await fetch(base + '/api/users', authed(cookie));
+  users = await res.json();
+  m = users.find((u: any) => u.id === member.id);
+  assert.equal(m.workload, 20);
+
+  // Add 5 more active tasks (total 6 active) => capped at 100
+  for (let i = 0; i < 5; i++) {
+    await prisma.task.create({ data: { projectId: project.id, name: `More ${i}`, ownerId: member.id, status: 'To do' } });
+  }
+
+  res = await fetch(base + '/api/users', authed(cookie));
+  users = await res.json();
+  m = users.find((u: any) => u.id === member.id);
+  assert.equal(m.workload, 100);
+
+  await close();
+});
+

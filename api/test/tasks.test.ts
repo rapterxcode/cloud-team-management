@@ -67,3 +67,35 @@ test('invalid phase/status rejected; delete works', async () => {
   assert.equal(await prisma.task.count(), 0);
   await close();
 });
+
+test('task description can be set, updated, and validated for max length', async () => {
+  const { base, close } = await makeServer();
+  const { member, cookie, project } = await setup(base);
+
+  // Default description is empty string
+  const created = await fetch(base + '/api/tasks', authed(cookie, 'POST', {
+    projectId: project.id, name: 'With notes', ownerId: member.id,
+    description: 'Detailed runbook notes\nStep 1: Check logs\nStep 2: Deploy',
+  }));
+  assert.equal(created.status, 201);
+  const t = await created.json();
+  assert.equal(t.description, 'Detailed runbook notes\nStep 1: Check logs\nStep 2: Deploy');
+
+  // Update description via PATCH
+  const updated = await fetch(base + `/api/tasks/${t.id}`, authed(cookie, 'PATCH', {
+    description: 'Updated notes',
+  }));
+  assert.equal(updated.status, 200);
+  assert.equal((await updated.json()).description, 'Updated notes');
+
+  // Reject oversized description (> 10000 chars)
+  const tooLong = await fetch(base + '/api/tasks', authed(cookie, 'POST', {
+    projectId: project.id, name: 'Too long', ownerId: member.id,
+    description: 'A'.repeat(10001),
+  }));
+  assert.equal(tooLong.status, 400);
+  assert.match((await tooLong.json()).error, /Description cannot exceed 10000 characters/);
+
+  await close();
+});
+

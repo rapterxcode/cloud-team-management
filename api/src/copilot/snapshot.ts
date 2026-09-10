@@ -12,7 +12,15 @@ export async function buildSnapshot(prisma: PrismaClient): Promise<string> {
   const [projects, tasks, users, resources, articles] = await Promise.all([
     prisma.project.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.task.findMany({ include: { owner: { select: { name: true } }, project: { select: { name: true } } }, orderBy: { createdAt: 'asc' } }),
-    prisma.user.findMany({ where: { isActive: true }, select: { name: true, title: true, workload: true }, orderBy: { createdAt: 'asc' } }),
+    prisma.user.findMany({
+      where: { isActive: true },
+      select: {
+        name: true,
+        title: true,
+        _count: { select: { tasks: { where: { status: { not: 'Done' } } } } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
     prisma.cloudResource.findMany({ orderBy: { name: 'asc' } }),
     prisma.knowledgeArticle.findMany({ orderBy: { createdAt: 'asc' } }),
   ]);
@@ -26,10 +34,18 @@ export async function buildSnapshot(prisma: PrismaClient): Promise<string> {
   sections.push(
     'TASKS\n' +
       (tasks
-        .map((t) => `- ${t.name} (project: ${t.project.name}) owner=${t.owner.name} status=${t.status} priority=${t.priority} ${t.start || '?'}→${t.date || '?'}`)
+        .map((t) => `- ${t.name} (project: ${t.project.name}) owner=${t.owner.name} status=${t.status} priority=${t.priority} ${t.start || '?'}→${t.date || '?'}${t.description ? ` notes: ${preview(t.description)}` : ''}`)
         .join('\n') || '- (none)'),
   );
-  sections.push('TEAM\n' + (users.map((u) => `- ${u.name}${u.title ? `, ${u.title}` : ''} (workload ${u.workload}%)`).join('\n') || '- (none)'));
+  sections.push(
+    'TEAM\n' +
+      (users
+        .map((u) => {
+          const load = Math.min(100, (u._count?.tasks ?? 0) * 20);
+          return `- ${u.name}${u.title ? `, ${u.title}` : ''} (workload ${load}%)`;
+        })
+        .join('\n') || '- (none)'),
+  );
   sections.push(
     `CLOUD RESOURCES (total $${totalCost}/mo)\n` +
       (resources.map((r) => `- ${r.name} [${r.provider} ${r.type}] ${r.status} $${r.monthlyCost}/mo`).join('\n') || '- (none)'),

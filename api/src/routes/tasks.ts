@@ -20,16 +20,18 @@ export function tasksRoutes(prisma: PrismaClient) {
 
   r.post('/', async (req, res, next) => {
     try {
-      const { projectId, name, ownerId, phase = 'Planning', start = '', date = '' } = req.body ?? {};
+      const { projectId, name, ownerId, phase = 'Planning', start = '', date = '', description = '' } = req.body ?? {};
       const trimmed = String(name ?? '').trim();
       if (!trimmed) throw badRequest('A name is required');
+      if (description !== undefined && String(description).length > 10000)
+        throw badRequest('Description cannot exceed 10000 characters');
       if (!(await prisma.project.findUnique({ where: { id: String(projectId ?? '') } })))
         throw badRequest('Choose a project');
       await assertActiveOwner(ownerId);
       assertIn(phase, PHASES, 'Phase');
       validateDates(String(start), String(date));
       const t = await prisma.task.create({
-        data: { projectId, name: trimmed, ownerId, phase, start: String(start), date: String(date) },
+        data: { projectId, name: trimmed, ownerId, phase, start: String(start), date: String(date), description: String(description) },
         include: OWNER,
       });
       res.status(201).json(t);
@@ -40,8 +42,10 @@ export function tasksRoutes(prisma: PrismaClient) {
     try {
       const existing = await prisma.task.findUnique({ where: { id: req.params.id } });
       if (!existing) return res.status(404).json({ error: 'Task not found' });
-      const { name, ownerId, phase, status, priority, start, date } = req.body ?? {};
+      const { name, ownerId, phase, status, priority, start, date, description } = req.body ?? {};
       if (name !== undefined && !String(name).trim()) throw badRequest('A name is required');
+      if (description !== undefined && String(description).length > 10000)
+        throw badRequest('Description cannot exceed 10000 characters');
       if (ownerId !== undefined) await assertActiveOwner(ownerId);
       if (phase !== undefined) assertIn(phase, PHASES, 'Phase');
       if (status !== undefined) assertIn(status, TASK_STATUSES, 'Status');
@@ -59,6 +63,7 @@ export function tasksRoutes(prisma: PrismaClient) {
           ...(priority !== undefined ? { priority } : {}),
           ...(start !== undefined ? { start: nextStart } : {}),
           ...(date !== undefined ? { date: nextDate } : {}),
+          ...(description !== undefined ? { description: String(description) } : {}),
         },
         include: OWNER,
       });
