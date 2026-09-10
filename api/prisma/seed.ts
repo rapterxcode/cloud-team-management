@@ -7,15 +7,17 @@ const DEMO_USERS = [
   { email: 'sarah.chen@demo.local', name: 'Sarah Chen', title: 'Cloud Engineer' },
   { email: 'james.wilson@demo.local', name: 'James Wilson', title: 'DevOps Engineer' },
   { email: 'priya.patel@demo.local', name: 'Priya Patel', title: 'SRE' },
+  { email: 'auditor@cloudteam.internal', name: 'Internal Auditor', title: 'Compliance Auditor' },
 ];
 
 export async function seed(prisma: PrismaClient) {
   const users: Record<string, string> = {};
   for (const d of DEMO_USERS) {
+    const role = d.email.startsWith('auditor') ? 'auditor' : 'member';
     const u = await prisma.user.upsert({
       where: { email: d.email },
       update: {},
-      create: { ...d, isActive: false, role: 'member', passwordHash: await hashPassword(randomUUID()) },
+      create: { ...d, isActive: false, role, passwordHash: await hashPassword(randomUUID()) },
     });
     users[d.name] = u.id;
   }
@@ -39,20 +41,58 @@ export async function seed(prisma: PrismaClient) {
     ];
     const ids: string[] = [];
     for (const p of projects) ids.push((await prisma.project.create({ data: p })).id);
+
+    // Create Documents for Project 1 (Cloud infrastructure migration)
+    const crDocument = await prisma.projectDocument.create({
+      data: {
+        projectId: ids[0],
+        storedName: randomUUID(),
+        originalName: 'CR-2026-001_Approved.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 1048576,
+        category: 'CR',
+        referenceNo: 'CR-2026-001',
+        uploadedById: users['Alex Morgan'],
+      }
+    });
+    await prisma.projectDocument.create({
+      data: {
+        projectId: ids[0],
+        storedName: randomUUID(),
+        originalName: 'Architecture_Diagram_v2.png',
+        mimeType: 'image/png',
+        sizeBytes: 204800,
+        category: 'Diagram',
+        uploadedById: users['Sarah Chen'],
+      }
+    });
+    await prisma.projectDocument.create({
+      data: {
+        projectId: ids[0],
+        storedName: randomUUID(),
+        originalName: 'CRA_Assessment.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 512000,
+        category: 'CRA',
+        uploadedById: users['Alex Morgan'],
+      }
+    });
+
+    const runbook = await prisma.knowledgeArticle.create({
+      data: { name: 'Production deployment checklist', category: 'Runbooks', authorId: users['Alex Morgan'], projectId: ids[0], body: 'Before you deploy\n\n1. Confirm the change has passed review and automated checks.\n2. Check the service dashboard and active incidents.\n3. Record the previous release and rollback procedure.\n4. Deploy to staging and verify the critical user journeys.\n5. Schedule the production change with the on-call engineer.\n\nAfter deployment\n\nWatch error rates and latency. Record the result and hand over any follow-up work.' }
+    });
+
     await prisma.task.createMany({
       data: [
         { projectId: ids[0], start: '2026-09-01', phase: 'Planning', date: '2026-09-07', name: 'Review production deployment pipeline', description: 'Verify GitHub Actions workflows, staging deployment steps, and rollback flags before cutting the production release.', status: 'In progress', priority: 'High', ownerId: users['Alex Morgan'] },
-        { projectId: ids[0], start: '2026-09-08', phase: 'Development', date: '2026-09-12', name: 'Configure staging environment', description: 'Provision compute and database instances in the staging VPC matching production network topology.', status: 'To do', priority: 'Medium', ownerId: users['Sarah Chen'] },
+        { projectId: ids[0], start: '2026-09-08', phase: 'Development', date: '2026-09-12', name: 'Configure staging environment', description: 'Provision compute and database instances in the staging VPC matching production network topology.', status: 'To do', priority: 'Medium', ownerId: users['Sarah Chen'], changeDocumentId: crDocument.id, sopArticleId: runbook.id },
         { projectId: ids[1], start: '2026-09-03', phase: 'Development', date: '2026-09-10', name: 'Update infrastructure documentation', description: 'Document cluster topology, ingress setup, and deployment runbooks in the Knowledge Hub.', status: 'In progress', priority: 'Medium', ownerId: users['James Wilson'] },
         { projectId: ids[2], start: '2026-09-05', phase: 'Planning', date: '2026-09-12', name: 'Audit unused cloud resources', description: 'Scan idle instances, unattached disks, and unreferenced buckets across AWS and GCP accounts.', status: 'To do', priority: 'High', ownerId: users['Priya Patel'] },
       ],
     });
-  }
 
-  if ((await prisma.knowledgeArticle.count()) === 0) {
     await prisma.knowledgeArticle.createMany({
       data: [
-        { name: 'Production deployment checklist', category: 'Runbooks', authorId: users['Alex Morgan'], body: 'Before you deploy\n\n1. Confirm the change has passed review and automated checks.\n2. Check the service dashboard and active incidents.\n3. Record the previous release and rollback procedure.\n4. Deploy to staging and verify the critical user journeys.\n5. Schedule the production change with the on-call engineer.\n\nAfter deployment\n\nWatch error rates and latency. Record the result and hand over any follow-up work.' },
         { name: 'Welcome to the cloud team', category: 'Onboarding', authorId: users['Sarah Chen'], body: 'Your first week\n\nMeet your buddy and review the team directory. Get familiar with our active projects, weekly priorities and service ownership.\n\nStart with a small task, review the relevant runbook and ask your buddy to walk you through the deployment workflow.\n\nKeep useful discoveries here so the next person can find them.' },
         { name: 'Cloud resource naming convention', category: 'Guides', authorId: users['James Wilson'], body: 'Use a consistent name for each resource:\n\nteam-service-environment-region\n\nExample: platform-api-staging-us-east\n\nInclude an owner, environment and project tag. Keep descriptions clear and avoid storing credentials in names or tags.' },
         { name: 'Weekly platform review · September 7', category: 'Meeting notes', authorId: users['Priya Patel'], body: 'Focus this week\n\n• Complete the staging environment setup.\n• Review the migration readiness checklist.\n• Identify unused resources for the next cost review.\n\nDecisions\n\nThe team will document deployment checks in the shared knowledge base. Each project owner will keep task dates up to date.' },

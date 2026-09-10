@@ -7,7 +7,7 @@ export const prisma = new PrismaClient();
 
 export async function resetDb() {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE users, projects, tasks, knowledge_articles, knowledge_attachments, cloud_resources CASCADE',
+    'TRUNCATE users, projects, tasks, knowledge_articles, knowledge_attachments, cloud_resources, project_documents CASCADE',
   );
   // Clear the session store too so tests are isolated (connect-pg-simple's
   // "session" table isn't a Prisma model). Guarded because it doesn't exist

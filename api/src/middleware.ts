@@ -4,11 +4,19 @@ import type { PrismaClient } from '@prisma/client';
 declare module 'express-session' {
   interface SessionData {
     userId?: string;
+    role?: string;
   }
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session.userId) return res.status(401).json({ error: 'Sign in required' });
+  next();
+}
+
+export function requireAuditorReadOnly(req: Request, res: Response, next: NextFunction) {
+  if (req.session.role === 'auditor' && req.method !== 'GET' && req.method !== 'HEAD') {
+    return res.status(403).json({ error: 'Auditor role has read-only access' });
+  }
   next();
 }
 
