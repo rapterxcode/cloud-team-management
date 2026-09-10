@@ -175,3 +175,48 @@ button{cursor:pointer}button:disabled{cursor:default}button,input,textarea{font:
 .task-row{cursor:pointer}
 .task-card{cursor:pointer}
 
+/* Markdown & Code styling */
+.markdown-content{font-size:15px;line-height:1.75;color:var(--foreground)}
+.markdown-content h1{font-size:1.5rem;font-weight:700;margin:1.2em 0 0.6em;color:var(--foreground);border-bottom:1px solid var(--border);padding-bottom:0.3em}
+.markdown-content h2{font-size:1.25rem;font-weight:600;margin:1.1em 0 0.5em;color:var(--foreground);border-bottom:1px solid var(--border);padding-bottom:0.2em}
+.markdown-content h3{font-size:1.1rem;font-weight:600;margin:1em 0 0.4em}
+.markdown-content p{margin:0.6em 0}
+.markdown-content ul,.markdown-content ol{padding-left:1.5em;margin:0.6em 0}
+.markdown-content li{margin:0.25em 0}
+.markdown-content blockquote{border-left:3px solid var(--primary);padding-left:12px;margin:0.8em 0;color:var(--muted-foreground);font-style:italic}
+.markdown-content hr{border:0;border-top:1px solid var(--border);margin:1.2em 0}
+.markdown-content table{width:100%;border-collapse:collapse;margin:1em 0;font-size:13px}
+.markdown-content th,.markdown-content td{border:1px solid var(--border);padding:6px 10px;text-align:left}
+.markdown-content th{background:var(--muted);font-weight:600}
+.inline-code{background:#f1ecf7;color:#6b46c1;padding:2px 6px;border-radius:5px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:0.88em}
+.code-block-wrapper{background:#1e1e2e;color:#cdd6f4;border-radius:8px;margin:12px 0;overflow:hidden;border:1px solid #313244}
+.code-block-header{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:#181825;font-size:11px;color:#a6adc8;border-bottom:1px solid #313244}
+.code-block-lang{font-weight:600;text-transform:uppercase;letter-spacing:0.05em}
+.code-block-copy{display:inline-flex;align-items:center;gap:5px;background:none;border:none;color:#a6adc8;cursor:pointer;padding:3px 6px;border-radius:4px;font:inherit;font-size:11px;transition:all .15s}
+.code-block-copy:hover{background:#313244;color:#cdd6f4}
+.code-block-pre{padding:12px;margin:0;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5}
+.code-block-pre code{background:none;padding:0;color:inherit}
+
+/* Search Highlights */
+.search-highlight{background:#fef08a;color:#854d0e;padding:1px 3px;border-radius:3px;font-weight:600}
+
+/* Editor Write / Preview Tabs */
+.editor-tabs{display:flex;gap:8px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.editor-tab{padding:6px 14px;background:none;border:none;border-bottom:2px solid transparent;font:inherit;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted-foreground)}
+.editor-tab.active{border-color:var(--primary);color:var(--foreground);font-weight:600}
+.editor-preview-container{border:1px solid var(--border);border-radius:8px;padding:12px;min-height:210px;max-height:50vh;overflow-y:auto;background:var(--background)}
+
+/* Copilot Task Draft Card */
+.task-draft-card{background:var(--card);border:1px solid #c4b5fd;border-radius:10px;padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:10px;box-shadow:0 2px 8px rgba(107,70,193,0.08)}
+.task-draft-head{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#6b46c1}
+.task-draft-title{font-size:15px;font-weight:700;color:var(--foreground)}
+.task-draft-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px}
+.task-draft-field{display:flex;flex-direction:column;gap:3px}
+.task-draft-field label{font-size:10px;text-transform:uppercase;color:var(--muted-foreground);font-weight:600}
+.task-draft-field select,.task-draft-field input{border:1px solid var(--border);border-radius:6px;padding:4px 6px;font:inherit;font-size:12px;background:var(--background)}
+.task-draft-desc{font-size:12px;color:var(--muted-foreground);background:var(--muted);padding:8px;border-radius:6px;max-height:80px;overflow-y:auto;white-space:pre-wrap}
+.task-draft-actions{display:flex;align-items:center;gap:8px;margin-top:4px}
+.task-draft-success{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#16a34a;background:#dcfce7;padding:8px 12px;border-radius:8px}
+.runbook-convert-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #c4b5fd;background:#f5f3ff;color:#6b46c1;border-radius:8px;padding:7px 12px;font:inherit;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s}
+.runbook-convert-btn:hover{background:#ede9fe}
+
