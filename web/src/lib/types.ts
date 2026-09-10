@@ -7,4 +7,17 @@ export type Attachment = { id: string; originalName: string; sizeBytes: number }
 export type Article = { id: string; name: string; category: string; body: string; author: { id: string; name: string }; attachments: Attachment[] };
 export type Resource = { id: string; name: string; provider: string; type: string; status: string; monthlyCost: number };
 
+export type TaskDraft = {
+  name: string;
+  projectId?: string;
+  projectName?: string;
+  ownerId?: string;
+  ownerName?: string;
+  phase?: string;
+  priority?: string;
+  start?: string;
+  date?: string;
+  description?: string;
+};
+
 export const withDue = (t: ApiTask): Task => ({ ...t, due: t.date || 'Not set', ownerName: t.owner.name });
