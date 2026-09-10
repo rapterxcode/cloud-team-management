@@ -8,6 +8,10 @@ The platform a cloud engineering team uses to track projects, tasks, knowledge, 
 A person with a login account on the platform. Replaces the old hardcoded "member" concept — the Team directory is now a view over Users, not a separate roster.
 _Avoid_: Member, account, team member (when referring to the entity itself — "team member" is fine as prose, not as a schema/type name)
 
+**Task**:
+A distinct unit of work belonging to a single Project and owned by one User, with an execution phase, status, dates, and description notes.
+_Avoid_: Ticket, issue, item, action item, subtask
+
 **Task owner**:
 The single User responsible for a Task, stored as a foreign key to `users.id` (not a name snapshot). Chosen from the same closed list of Users that populates the Team directory.
 _Avoid_: Assignee (not used anywhere in the existing UI copy)
@@ -29,3 +33,8 @@ _Avoid_: Project.team (old field name, retired)
 
 **Attachment**:
 A file (PDF, Office doc, image, or plain text; capped per file) uploaded to a Knowledge article. One article may have any number of Attachments — it's a one-to-many relationship, not a single-file field.
+
+**Workload**:
+The percentage capacity utilized by a User, derived dynamically from the count of active, incomplete Tasks they currently own.
+_Avoid_: Bandwidth, effort, story points, logged hours
+
