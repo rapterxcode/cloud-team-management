@@ -1,4 +1,5 @@
 export const PROJECT_STATUSES = ['New', 'On track', 'At risk', 'Completed'];
+export const DEFAULT_PHASES = ['Planning', 'Development', 'Testing', 'Launch', 'Audit'];
 export const PHASES = ['Planning', 'Development', 'Launch'];
 export const TASK_STATUSES = ['To do', 'In progress', 'Done'];
 export const PRIORITIES = ['High', 'Medium', 'Low'];
@@ -16,9 +17,10 @@ export function assertIn(value: unknown, list: string[], label: string) {
 // Mirrors web/src/lib/gantt.mjs exactly — messages must stay in sync.
 const DAY = 86400000;
 function day(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw badRequest('Enter a valid date.');
-  const time = Date.parse(value + 'T00:00:00Z');
-  if (!Number.isFinite(time) || new Date(time).toISOString().slice(0, 10) !== value) throw badRequest('Enter a valid date.');
+  if (!/^\d{4}-\d{2}-\d{2}/.test(value)) throw badRequest('Enter a valid date.');
+  const datePart = value.slice(0, 10);
+  const time = Date.parse(datePart + 'T00:00:00Z');
+  if (!Number.isFinite(time) || new Date(time).toISOString().slice(0, 10) !== datePart) throw badRequest('Enter a valid date.');
   return time / DAY;
 }
 export function validateDates(start: string, end: string) {

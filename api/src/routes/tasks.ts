@@ -32,11 +32,13 @@ export function tasksRoutes(prisma: PrismaClient) {
       if (!(await prisma.project.findUnique({ where: { id: String(projectId ?? '') } })))
         throw badRequest('Choose a project');
       await assertActiveOwner(ownerId);
-      assertIn(phase, PHASES, 'Phase');
+      const phaseStr = String(phase ?? 'Planning').trim();
+      if (!phaseStr) throw badRequest('Phase is required');
+      if (phaseStr.length > 50) throw badRequest('Phase must be 50 characters or less');
       assertIn(priority, PRIORITIES, 'Priority');
       validateDates(String(start), String(date));
       const t = await prisma.task.create({
-        data: { projectId, name: trimmed, ownerId, phase, priority, start: String(start), date: String(date), description: String(description), ...(sopArticleId ? { sopArticleId: String(sopArticleId) } : {}), ...(changeDocumentId ? { changeDocumentId: String(changeDocumentId) } : {}) },
+        data: { projectId, name: trimmed, ownerId, phase: phaseStr, priority, start: String(start), date: String(date), description: String(description), ...(sopArticleId ? { sopArticleId: String(sopArticleId) } : {}), ...(changeDocumentId ? { changeDocumentId: String(changeDocumentId) } : {}) },
         include: TASK_INCLUDE,
       });
       res.status(201).json(t);
@@ -52,7 +54,11 @@ export function tasksRoutes(prisma: PrismaClient) {
       if (description !== undefined && String(description).length > 10000)
         throw badRequest('Description cannot exceed 10000 characters');
       if (ownerId !== undefined) await assertActiveOwner(ownerId);
-      if (phase !== undefined) assertIn(phase, PHASES, 'Phase');
+      if (phase !== undefined) {
+        const p = String(phase).trim();
+        if (!p) throw badRequest('Phase cannot be empty');
+        if (p.length > 50) throw badRequest('Phase must be 50 characters or less');
+      }
       if (status !== undefined) assertIn(status, TASK_STATUSES, 'Status');
       if (priority !== undefined) assertIn(priority, PRIORITIES, 'Priority');
       const nextStart = start !== undefined ? String(start) : existing.start;
@@ -63,7 +69,7 @@ export function tasksRoutes(prisma: PrismaClient) {
         data: {
           ...(name !== undefined ? { name: String(name).trim() } : {}),
           ...(ownerId !== undefined ? { ownerId } : {}),
-          ...(phase !== undefined ? { phase } : {}),
+          ...(phase !== undefined ? { phase: String(phase).trim() } : {}),
           ...(status !== undefined ? { status } : {}),
           ...(priority !== undefined ? { priority } : {}),
           ...(start !== undefined ? { start: nextStart } : {}),

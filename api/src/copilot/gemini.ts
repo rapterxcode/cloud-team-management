@@ -44,7 +44,7 @@ const draftTaskTool: FunctionDeclaration = {
       name: { type: 'string', description: 'Task name or title' },
       projectName: { type: 'string', description: 'Target project name from workspace data' },
       ownerName: { type: 'string', description: 'Assigned owner/member name from workspace data' },
-      phase: { type: 'string', enum: ['Planning', 'Development', 'Launch'], description: 'Phase of the task' },
+      phase: { type: 'string', description: 'Phase of the task (e.g. Planning, Development, Testing, Launch, Audit)' },
       priority: { type: 'string', enum: ['Low', 'Medium', 'High'], description: 'Priority level' },
       start: { type: 'string', description: 'Start date in YYYY-MM-DD format if specified' },
       date: { type: 'string', description: 'Finish or due date in YYYY-MM-DD format if specified' },

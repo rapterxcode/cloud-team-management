@@ -153,11 +153,17 @@ export default function TaskDrawer({
 
               <label className="drawer-field">
                 <span className="field-label">Phase</span>
-                <NativeSelect name="phase" defaultValue={task.phase}>
-                  {['Planning', 'Development', 'Launch'].map((p) => (
-                    <NativeSelectOption key={p} value={p}>{p}</NativeSelectOption>
+                <input
+                  name="phase"
+                  list="task-drawer-phases"
+                  defaultValue={task.phase}
+                  placeholder="e.g. Planning, Testing, Audit"
+                />
+                <datalist id="task-drawer-phases">
+                  {['Planning', 'Development', 'Testing', 'Launch', 'Audit'].map((p) => (
+                    <option key={p} value={p} />
                   ))}
-                </NativeSelect>
+                </datalist>
               </label>
 
               <label className="drawer-field">
@@ -171,12 +177,22 @@ export default function TaskDrawer({
 
               <label className="drawer-field">
                 <span className="field-label">Start date</span>
-                <input type="date" name="start" defaultValue={task.start || ''} />
+                <input
+                  type="date"
+                  name="start"
+                  defaultValue={(task.start || '').slice(0, 10)}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
+                />
               </label>
 
               <label className="drawer-field">
                 <span className="field-label">Finish date</span>
-                <input type="date" name="date" defaultValue={task.date || ''} />
+                <input
+                  type="date"
+                  name="date"
+                  defaultValue={(task.date || '').slice(0, 10)}
+                  onClick={(e) => e.currentTarget.showPicker?.()}
+                />
               </label>
             </div>
 

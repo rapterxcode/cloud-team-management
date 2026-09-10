@@ -1,8 +1,9 @@
 const DAY=86400000;
 function day(value){
- if(!/^\d{4}-\d{2}-\d{2}$/.test(value))throw new Error('Enter a valid date.');
- const time=Date.parse(value+'T00:00:00Z');
- if(!Number.isFinite(time)||new Date(time).toISOString().slice(0,10)!==value)throw new Error('Enter a valid date.');
+ if(!/^\d{4}-\d{2}-\d{2}/.test(value))throw new Error('Enter a valid date.');
+ const datePart=value.slice(0,10);
+ const time=Date.parse(datePart+'T00:00:00Z');
+ if(!Number.isFinite(time)||new Date(time).toISOString().slice(0,10)!==datePart)throw new Error('Enter a valid date.');
  return time/DAY;
 }
 export function validateDates(start,end){

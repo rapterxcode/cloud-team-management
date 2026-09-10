@@ -57,14 +57,15 @@ test('owner must be an active user; deactivated owner keeps existing tasks', asy
   await close();
 });
 
-test('invalid phase/status rejected; delete works', async () => {
+test('custom phase supported; blank phase rejected; delete works', async () => {
   const { base, close } = await makeServer();
   const { member, cookie, project } = await setup(base);
-  const bad = await fetch(base + '/api/tasks', authed(cookie, 'POST', { projectId: project.id, name: 'X', ownerId: member.id, phase: 'Testing' }));
-  assert.equal(bad.status, 400);
+  const blank = await fetch(base + '/api/tasks', authed(cookie, 'POST', { projectId: project.id, name: 'X', ownerId: member.id, phase: '   ' }));
+  assert.equal(blank.status, 400);
+  const custom = await fetch(base + '/api/tasks', authed(cookie, 'POST', { projectId: project.id, name: 'Custom Task', ownerId: member.id, phase: 'Testing' }));
+  assert.equal(custom.status, 201);
   const t = await prisma.task.create({ data: { projectId: project.id, name: 'Del', ownerId: member.id } });
   assert.equal((await fetch(base + `/api/tasks/${t.id}`, authed(cookie, 'DELETE'))).status, 204);
-  assert.equal(await prisma.task.count(), 0);
   await close();
 });
 

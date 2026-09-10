@@ -27,11 +27,13 @@ export function projectsRoutes(prisma: PrismaClient) {
       if (!Number.isInteger(year) || year < 2000 || year > 2100) throw badRequest('Year must be between 2000 and 2100');
       const status = req.body?.status !== undefined ? String(req.body.status) : undefined;
       if (status !== undefined) assertIn(status, PROJECT_STATUSES, 'Status');
+      const due = req.body?.due !== undefined ? String(req.body.due) : undefined;
       const p = await prisma.project.create({
         data: {
           name,
           description: String(req.body?.description ?? 'Ready to get started.'),
           year,
+          ...(due !== undefined ? { due } : {}),
           ...(status !== undefined ? { status } : {}),
         },
       });
