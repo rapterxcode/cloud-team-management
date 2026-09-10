@@ -3,7 +3,8 @@ export const PHASES = ['Planning', 'Development', 'Launch'];
 export const TASK_STATUSES = ['To do', 'In progress', 'Done'];
 export const PRIORITIES = ['High', 'Medium', 'Low'];
 export const CATEGORIES = ['Guides', 'Runbooks', 'Onboarding', 'Meeting notes'];
-
+export const AUDIT_CATEGORIES = ['CR', 'CC', 'CRA', 'Diagram', 'RBAC', 'TestEvidence', 'General'] as const;
+export const DOCUMENT_EXTS = new Set(['.pdf', '.xls', '.xlsx', '.doc', '.docx', '.png', '.jpg', '.jpeg', '.svg', '.csv', '.zip', '.yaml', '.json', '.txt']);
 export function badRequest(message: string): Error & { status: number } {
   return Object.assign(new Error(message), { status: 400 });
 }

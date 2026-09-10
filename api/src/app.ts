@@ -3,7 +3,7 @@ import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import pg from 'pg';
 import type { PrismaClient } from '@prisma/client';
-import { originCheck } from './middleware.js';
+import { originCheck, requireAuditorReadOnly } from './middleware.js';
 import { authRoutes } from './routes/auth.js';
 import { usersRoutes } from './routes/users.js';
 import { projectsRoutes } from './routes/projects.js';
@@ -12,6 +12,7 @@ import { knowledgeRoutes } from './routes/knowledge.js';
 import { attachmentUploadRoutes, attachmentsRoutes } from './routes/attachments.js';
 import { resourcesRoutes } from './routes/resources.js';
 import { copilotRoutes } from './routes/copilot.js';
+import { projectDocumentsRoutes } from './routes/project-documents.js';
 import type { AskLLM } from './copilot/gemini.js';
 
 // One shared pool for the whole process. createApp() is called once per test
@@ -63,12 +64,18 @@ export function createApp(prisma: PrismaClient, opts: { askLLM?: AskLLM } = {}) 
   });
 
   app.use('/api/auth', authRoutes(prisma));
+  
+  // Auditor guard: allow read-only access to business endpoints.
+  // Must be after /api/auth so auditors can still POST to /api/auth/logout
+  app.use(requireAuditorReadOnly);
+
   app.use('/api/users', usersRoutes(prisma));
   app.use('/api/projects', projectsRoutes(prisma));
   app.use('/api/tasks', tasksRoutes(prisma));
   app.use('/api/knowledge', attachmentUploadRoutes(prisma));
   app.use('/api/knowledge', knowledgeRoutes(prisma));
   app.use('/api/attachments', attachmentsRoutes(prisma));
+  app.use('/api', projectDocumentsRoutes(prisma));
   app.use('/api/resources', resourcesRoutes(prisma));
   app.use('/api/copilot', copilotRoutes(prisma, opts.askLLM));
   // More routes mounted by later tasks.

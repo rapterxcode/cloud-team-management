@@ -13,6 +13,7 @@ export function authRoutes(prisma: PrismaClient) {
     if (!user || !user.isActive || !(await verifyPassword(password, user.passwordHash)))
       return res.status(401).json({ error: 'Incorrect email or password' });
     req.session.userId = user.id;
+    req.session.role = user.role;
     // Persist the session before responding so an immediately-following request
     // (e.g. logout) reliably sees it — otherwise the store write can land after
     // the next request has already read an empty session.

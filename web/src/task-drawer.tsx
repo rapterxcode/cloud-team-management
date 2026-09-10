@@ -9,8 +9,12 @@ interface TaskDrawerProps {
   onClose: () => void;
   projects: Project[];
   owners: { id: string; name: string }[];
+  articles?: Array<{ id: string; name: string; category: string }>;
+  projectDocuments?: Array<{ id: string; originalName: string; category: string; referenceNo: string; projectId: string }>;
   onUpdate: (id: string, changes: Record<string, unknown>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onPreviewDocument?: (docId: string) => void;
+  onOpenArticle?: (articleId: string) => void;
 }
 
 export default function TaskDrawer({
@@ -19,8 +23,12 @@ export default function TaskDrawer({
   onClose,
   projects,
   owners,
+  articles = [],
+  projectDocuments = [],
   onUpdate,
   onDelete,
+  onPreviewDocument,
+  onOpenArticle,
 }: TaskDrawerProps) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -32,6 +40,7 @@ export default function TaskDrawer({
   if (!open || !task) return null;
 
   const currentProject = projects.find((p) => p.id === task.projectId);
+  const availableChangeDocs = projectDocuments.filter(d => d.projectId === task.projectId && (d.category === 'CR' || d.category === 'CC'));
 
   const handleSubmit = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -48,6 +57,8 @@ export default function TaskDrawer({
     const priority = data.get('priority') as string;
     const start = data.get('start') as string;
     const date = data.get('date') as string;
+    const changeDocumentId = data.get('changeDocumentId') as string;
+    const sopArticleId = data.get('sopArticleId') as string;
 
     setSaving(true);
     setError('');
@@ -61,6 +72,8 @@ export default function TaskDrawer({
         priority,
         start,
         date,
+        changeDocumentId: changeDocumentId || null,
+        sopArticleId: sopArticleId || null,
       });
       onClose();
     } catch (e) {
@@ -165,6 +178,46 @@ export default function TaskDrawer({
                 <span className="field-label">Finish date</span>
                 <input type="date" name="date" defaultValue={task.date || ''} />
               </label>
+            </div>
+
+            <div className="drawer-field">
+              <span className="field-label">Change Authorization (ISO 27001 / BOT)</span>
+              <NativeSelect name="changeDocumentId" defaultValue={task.changeDocumentId || ''}>
+                <NativeSelectOption value="">None (Unlinked)</NativeSelectOption>
+                {availableChangeDocs.map(doc => (
+                  <NativeSelectOption key={doc.id} value={doc.id}>
+                    {doc.referenceNo ? `${doc.referenceNo} - ` : ''}{doc.originalName}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              {task.changeDocument && (
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="badge green-badge">Authorized: {task.changeDocument.referenceNo || task.changeDocument.originalName}</span>
+                  <button type="button" className="text-button" onClick={() => onPreviewDocument?.(task.changeDocument!.id)} style={{ padding: '2px 6px', fontSize: '12px' }}>
+                    View Document
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="drawer-field">
+              <span className="field-label">Standard Operating Procedure (SOP / Runbook)</span>
+              <NativeSelect name="sopArticleId" defaultValue={task.sopArticleId || ''}>
+                <NativeSelectOption value="">None (No SOP)</NativeSelectOption>
+                {articles.map(art => (
+                  <NativeSelectOption key={art.id} value={art.id}>
+                    {art.name}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+              {task.sopArticle && (
+                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="badge blue-badge">SOP: {task.sopArticle.name}</span>
+                  <button type="button" className="text-button" onClick={() => onOpenArticle?.(task.sopArticle!.id)} style={{ padding: '2px 6px', fontSize: '12px' }}>
+                    Read Runbook
+                  </button>
+                </div>
+              )}
             </div>
 
             <label className="drawer-field">

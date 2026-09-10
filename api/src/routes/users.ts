@@ -36,7 +36,7 @@ export function usersRoutes(prisma: PrismaClient) {
     const { email, name, password, title = '', role = 'member' } = req.body ?? {};
     if (!email || !name || !password) return res.status(400).json({ error: 'Email, name and password are required' });
     if (String(password).length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
-    if (!['admin', 'member'].includes(role)) return res.status(400).json({ error: 'Role must be admin or member' });
+    if (!['admin', 'member', 'auditor'].includes(role)) return res.status(400).json({ error: 'Role must be admin, member or auditor' });
     if (await prisma.user.findUnique({ where: { email: String(email).toLowerCase() } }))
       return res.status(400).json({ error: 'A user with this email already exists' });
     const u = await prisma.user.create({
@@ -56,8 +56,8 @@ export function usersRoutes(prisma: PrismaClient) {
     const existing = await prisma.user.findUnique({ where: { id: String(req.params.id) } });
     if (!existing) return res.status(404).json({ error: 'User not found' });
     const { name, title, role, isActive, password } = req.body ?? {};
-    if (role !== undefined && !['admin', 'member'].includes(role))
-      return res.status(400).json({ error: 'Role must be admin or member' });
+    if (role !== undefined && !['admin', 'member', 'auditor'].includes(role))
+      return res.status(400).json({ error: 'Role must be admin, member or auditor' });
     if (password !== undefined && String(password).length < 8)
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     // Last-admin guard: never let the final active admin be deactivated or demoted.
