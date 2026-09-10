@@ -40,3 +40,8 @@ dist/
 
 # api local dev/test uploads
 attachments-dev/
+
+# worktrees and superpowers
+.worktrees/
+.superpowers/
+
