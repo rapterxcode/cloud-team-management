@@ -42,6 +42,9 @@ dist/
 attachments-dev/
 
 # worktrees and superpowers
+.worktrees
 .worktrees/
+.superpowers
 .superpowers/
+
 
