@@ -140,6 +140,8 @@ export function knowledgeRoutes(prisma: PrismaClient) {
         throw badRequest(`Category "${category}" does not exist. Please create it first.`);
       }
 
+      const chatHistory = req.body?.chatHistory;
+
       const a = await prisma.knowledgeArticle.create({
         data: {
           name,
@@ -148,6 +150,7 @@ export function knowledgeRoutes(prisma: PrismaClient) {
           format,
           authorId: req.session.userId!,
           ...(projectId ? { projectId: String(projectId) } : {}),
+          ...(chatHistory !== undefined ? { chatHistory } : {}),
         },
         include: INCLUDE,
       });
@@ -159,7 +162,7 @@ export function knowledgeRoutes(prisma: PrismaClient) {
     try {
       const existing = await prisma.knowledgeArticle.findUnique({ where: { id: req.params.id } });
       if (!existing) return res.status(404).json({ error: 'Article not found' });
-      const { name, category, body, projectId, format } = req.body ?? {};
+      const { name, category, body, projectId, format, chatHistory } = req.body ?? {};
 
       if (name !== undefined && !String(name).trim()) throw badRequest('A name is required');
       if (body !== undefined && !String(body).trim()) throw badRequest('Content is required');
@@ -186,6 +189,7 @@ export function knowledgeRoutes(prisma: PrismaClient) {
           ...(body !== undefined ? { body: String(body).trim() } : {}),
           ...(format !== undefined ? { format: String(format).toLowerCase().trim() } : {}),
           ...(projectId !== undefined ? { projectId: projectId ? String(projectId) : null } : {}),
+          ...(chatHistory !== undefined ? { chatHistory } : {}),
         },
         include: INCLUDE,
       });

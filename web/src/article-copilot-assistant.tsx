@@ -51,6 +51,8 @@ export interface ArticleCopilotAssistantProps {
   onToggleOpen?: (open: boolean) => void;
   isFullWorkspace?: boolean;
   onToggleFullWorkspace?: (full: boolean) => void;
+  initialMessages?: ChatMessageItem[];
+  onMessagesChange?: (messages: ChatMessageItem[]) => void;
   className?: string;
 }
 
@@ -67,6 +69,8 @@ export function ArticleCopilotAssistant({
   onToggleOpen,
   isFullWorkspace = false,
   onToggleFullWorkspace,
+  initialMessages,
+  onMessagesChange,
   className = '',
 }: ArticleCopilotAssistantProps) {
   // ISO 27001 / BOT Segregation of Duties: Auditors have zero access to generative AI authoring tools
@@ -88,7 +92,24 @@ export function ArticleCopilotAssistant({
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessageItem[]>([]);
+  const [messages, setMessages] = useState<ChatMessageItem[]>(initialMessages ?? []);
+
+  // Sync when initialMessages changes (e.g. user opens an article with saved chat history)
+  useEffect(() => {
+    if (initialMessages) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages]);
+
+  const updateMessages = (updater: ChatMessageItem[] | ((prev: ChatMessageItem[]) => ChatMessageItem[])) => {
+    setMessages((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (onMessagesChange) {
+        onMessagesChange(next);
+      }
+      return next;
+    });
+  };
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -123,7 +144,7 @@ export function ArticleCopilotAssistant({
       },
     ];
 
-    setMessages(newMessages);
+    updateMessages(newMessages);
     setPrompt('');
     setLoading(true);
 
@@ -148,7 +169,7 @@ export function ArticleCopilotAssistant({
       const assistantMsgId = 'asst_' + Date.now();
       const hasDraft = res.draftArticle && Boolean(res.draftArticle.body);
 
-      setMessages((prev) => [
+      updateMessages((prev) => [
         ...prev,
         {
           id: assistantMsgId,
@@ -172,7 +193,7 @@ export function ArticleCopilotAssistant({
       }
 
       setError(friendlyError);
-      setMessages((prev) => [
+      updateMessages((prev) => [
         ...prev,
         {
           id: 'err_' + Date.now(),
@@ -192,7 +213,7 @@ export function ArticleCopilotAssistant({
     if (!targetMsg || !targetMsg.proposal) return;
 
     onApply(targetMsg.proposal, mode);
-    setMessages((prev) =>
+    updateMessages((prev) =>
       prev.map((m) =>
         m.id === messageId ? { ...m, status: mode === 'append' ? 'appended' : 'applied' } : m,
       ),
@@ -200,19 +221,19 @@ export function ArticleCopilotAssistant({
   };
 
   const handleDiscardMessageProposal = (messageId: string) => {
-    setMessages((prev) =>
+    updateMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, status: 'discarded' } : m)),
     );
   };
 
   const togglePreview = (messageId: string) => {
-    setMessages((prev) =>
+    updateMessages((prev) =>
       prev.map((m) => (m.id === messageId ? { ...m, previewOpen: !m.previewOpen } : m)),
     );
   };
 
   const handleClearChat = () => {
-    setMessages([]);
+    updateMessages([]);
     setError(null);
   };
 

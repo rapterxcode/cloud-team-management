@@ -70,6 +70,7 @@ model KnowledgeArticle {
   category    String
   body        String
   format      String                @default("markdown")
+  chatHistory Json?                 @map("chat_history")
   authorId    String                @map("author_id")
   author      User                  @relation(fields: [authorId], references: [id])
   projectId   String?               @map("project_id")

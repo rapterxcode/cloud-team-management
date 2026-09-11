@@ -21,7 +21,7 @@ import {
 import type { Article, KnowledgeCategory, Project, Me } from '@/lib/types';
 import MarkdownViewer from './markdown-viewer';
 import EditorToolbar from './editor-toolbar';
-import ArticleCopilotAssistant from './article-copilot-assistant';
+import ArticleCopilotAssistant, { type ChatMessageItem } from './article-copilot-assistant';
 import { estimateReadingTime } from './lib/toc.mjs';
 
 export type ArticleEditorDialogProps = {
@@ -37,6 +37,7 @@ export type ArticleEditorDialogProps = {
     body: string;
     format: 'markdown' | 'html';
     projectId?: string;
+    chatHistory?: any[] | null;
   }) => Promise<void>;
 };
 
@@ -57,6 +58,7 @@ export default function ArticleEditorDialog({
   const [body, setBody] = useState('');
   const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview' | 'ai-chat'>('split');
   const [copilotOpen, setCopilotOpen] = useState(true);
+  const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>([]);
   const [previousState, setPreviousState] = useState<{
     name: string;
     body: string;
@@ -84,12 +86,40 @@ export default function ArticleEditorDialog({
         setProjectId(editing.projectId || '');
         setFormat(editing.format === 'html' ? 'html' : 'markdown');
         setBody(editing.body || '');
+
+        // Restore chat history from editing article or local backup
+        let restoredChat: ChatMessageItem[] = [];
+        if (Array.isArray(editing.chatHistory) && editing.chatHistory.length > 0) {
+          restoredChat = editing.chatHistory as ChatMessageItem[];
+        } else {
+          try {
+            const localSaved = localStorage.getItem(`ctm_article_chat_${editing.id}`);
+            if (localSaved) {
+              restoredChat = JSON.parse(localSaved);
+            }
+          } catch {
+            restoredChat = [];
+          }
+        }
+        setChatMessages(restoredChat);
       } else {
         setName('');
         setCategory(categories[0]?.name || 'Guides');
         setProjectId('');
         setFormat('markdown');
         setBody('');
+
+        // For new articles: restore draft chat if user previously drafted without saving
+        let draftChat: ChatMessageItem[] = [];
+        try {
+          const draftSaved = localStorage.getItem('ctm_article_draft_chat');
+          if (draftSaved) {
+            draftChat = JSON.parse(draftSaved);
+          }
+        } catch {
+          draftChat = [];
+        }
+        setChatMessages(draftChat);
       }
       setPreviousState(null);
       setError(null);
@@ -158,6 +188,27 @@ export default function ArticleEditorDialog({
     if (viewMode === 'preview') setViewMode('split');
   };
 
+  const handleChatMessagesChange = (nextMessages: ChatMessageItem[]) => {
+    setChatMessages(nextMessages);
+    try {
+      if (editing?.id) {
+        if (nextMessages.length > 0) {
+          localStorage.setItem(`ctm_article_chat_${editing.id}`, JSON.stringify(nextMessages));
+        } else {
+          localStorage.removeItem(`ctm_article_chat_${editing.id}`);
+        }
+      } else {
+        if (nextMessages.length > 0) {
+          localStorage.setItem('ctm_article_draft_chat', JSON.stringify(nextMessages));
+        } else {
+          localStorage.removeItem('ctm_article_draft_chat');
+        }
+      }
+    } catch {
+      // ignore quota limits
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = name.trim();
@@ -182,7 +233,16 @@ export default function ArticleEditorDialog({
         body: cleanBody,
         format,
         projectId: projectId ? projectId : undefined,
+        chatHistory: chatMessages.length > 0 ? chatMessages : null,
       });
+      // Clean up localStorage backup on successful save
+      try {
+        if (editing?.id) {
+          localStorage.removeItem(`ctm_article_chat_${editing.id}`);
+        } else {
+          localStorage.removeItem('ctm_article_draft_chat');
+        }
+      } catch {}
       onOpenChange(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Could not save article.');
@@ -369,6 +429,8 @@ export default function ArticleEditorDialog({
                   isOpen={true}
                   isFullWorkspace={true}
                   onToggleFullWorkspace={() => setViewMode('split')}
+                  initialMessages={chatMessages}
+                  onMessagesChange={handleChatMessagesChange}
                   canRevert={!!previousState}
                   onRevert={() => {
                     if (previousState) {
@@ -520,6 +582,8 @@ export default function ArticleEditorDialog({
                       onToggleOpen={setCopilotOpen}
                       isFullWorkspace={true}
                       onToggleFullWorkspace={() => setViewMode('ai-chat')}
+                      initialMessages={chatMessages}
+                      onMessagesChange={handleChatMessagesChange}
                       canRevert={!!previousState}
                       onRevert={() => {
                         if (previousState) {

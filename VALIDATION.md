@@ -396,4 +396,40 @@ User requested: "รวม Editor and Full ai chat workspace เลย ครั
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
 
+---
+
+## AI Copilot Smart Editor: Persistent Multi-Turn Chat History — 2026-09-11
+
+**Issue Addressed:**
+User requested: "ควรมีการเก็บ chat history ด้วยนะ เพื่อจะได้ ย้อนกลับมาแก้ไข เอกสารได้" (Persist chat history so users can return to revise/edit documents).
+
+**Architecture & Implementation:**
+1. **Database Persistence (`knowledge_articles.chat_history JSONB`):**
+   - Added `chatHistory Json? @map("chat_history")` to `KnowledgeArticle` model in `api/prisma/schema.prisma`.
+   - Migration `20260911113000_knowledge_article_chat_history/migration.sql` applies `ALTER TABLE "knowledge_articles" ADD COLUMN "chat_history" JSONB;`.
+   - API endpoints (`POST /api/knowledge` and `PATCH /api/knowledge/:id`) in `api/src/routes/knowledge.ts` accept and persist `chatHistory`.
+2. **Frontend State & Dialog Lifecycle:**
+   - Updated `web/src/lib/types.ts` to include `chatHistory?: any[] | null` on `Article`.
+   - Updated `web/src/article-copilot-assistant.tsx` with `initialMessages` and `onMessagesChange` props, broadcasting all message list updates (user prompts, AI responses, proposal cards, statuses).
+   - Updated `web/src/article-editor-dialog.tsx`:
+     - Restores `editing.chatHistory` when editing existing articles.
+     - Saves/restores draft chat messages in `localStorage` (`ctm_article_draft_chat`).
+     - Submits `chatHistory` upon saving article and cleans up draft storage.
+3. **Multi-Turn Context Continuity:**
+   - Previous conversation thread with proposal cards (`applied`, `appended`, `discarded`) is accurately restored upon reopening the article editor.
+   - Users can seamlessly resume multi-turn conversations with Gemini with full context preserved.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **47/47 pass** (100% green).
+- `npm --prefix api run build`: Clean TypeScript compile (`tsc -p tsconfig.json` 0 errors).
+- `npm --prefix web run build`: Clean TypeScript and Vite compile (0 errors).
+- Database migration applied cleanly on container startup (`npx prisma migrate deploy`).
+- `docker compose up -d --build`:
+  - `cloud-team-management-api-1`: Healthy (migrate + seed ran).
+  - `cloud-team-management-caddy-1`: Healthy.
+  - `cloud-team-management-postgres-1`: Healthy.
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+
+
 

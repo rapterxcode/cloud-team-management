@@ -10,6 +10,7 @@ export type Article = {
   category: string;
   body: string;
   format?: 'markdown' | 'html';
+  chatHistory?: any[] | null;
   author: { id: string; name: string };
   attachments: Attachment[];
   projectId?: string | null;
