@@ -3,12 +3,27 @@ import { createApp } from '../src/app.js';
 import { hashPassword } from '../src/passwords.js';
 import { resetLoginLimiter } from '../src/middleware.js';
 
+const rawUrl = process.env.DATABASE_URL;
+if (rawUrl && rawUrl.includes('/ctm') && !rawUrl.includes('/ctm_test')) {
+  process.env.DATABASE_URL = rawUrl.replace(/\/ctm(\?|$)/, '/ctm_test$1');
+}
+
 export const prisma = new PrismaClient();
 
 export async function resetDb() {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE users, projects, tasks, knowledge_articles, knowledge_attachments, cloud_resources, project_documents, knowledge_categories CASCADE',
+    'TRUNCATE users, workspaces, workspace_members, access_logs, audit_logs, projects, tasks, knowledge_articles, knowledge_attachments, cloud_resources, project_documents, knowledge_categories, copilot_conversations CASCADE',
   );
+  await prisma.workspace.create({
+    data: {
+      id: 'default-workspace-engineering',
+      name: 'Cloud workspace',
+      type: 'engineering',
+      description: 'Core engineering & platform delivery workspace',
+      color: 'purple',
+      icon: 'Cloud',
+    },
+  });
   // Clear the session store too so tests are isolated (connect-pg-simple's
   // "session" table isn't a Prisma model). Guarded because it doesn't exist
   // until the first makeServer() creates it.

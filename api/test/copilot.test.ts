@@ -151,3 +151,78 @@ test('POST /api/copilot returns draftTasks array with resolved projects and owne
   await close();
 });
 
+test('POST /api/copilot returns draftProject for new project proposals', async () => {
+  const fake: AskLLM = async () => ({
+    answer: "I've drafted a project proposal for WebApp Example.",
+    draftProject: {
+      name: 'WebApp Example',
+      description: 'Modern full-stack web application showcase',
+      year: 2026,
+      status: 'New',
+      due: '2026-12-31',
+    },
+  });
+  const { base, close } = await makeServer({ askLLM: fake });
+  await createUser('lead@team.test', 'pw123456');
+  const { cookie } = await login(base, 'lead@team.test', 'pw123456');
+
+  const res = await fetch(base + '/api/copilot', authed(cookie, 'POST', { question: 'Create project WebApp Example' }));
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.ok(data.draftProject);
+  assert.equal(data.draftProject.name, 'WebApp Example');
+  assert.equal(data.draftProject.year, 2026);
+  assert.equal(data.draftProject.status, 'New');
+  assert.equal(data.draftProject.due, '2026-12-31');
+  await close();
+});
+
+test('POST /api/copilot returns full workspace scaffolding with draftProject, draftArticles, and draftTasks', async () => {
+  const fake: AskLLM = async () => ({
+    answer: "I've prepared project, knowledge, and task proposals for WebApp Example.",
+    draftProject: {
+      name: 'WebApp Example',
+      description: 'Full stack project',
+      year: 2026,
+      status: 'New',
+      due: '2026-11-30',
+    },
+    draftArticles: [
+      {
+        name: 'Architecture Overview',
+        category: 'Architecture',
+        body: '# Architecture\n\nReact 19 + Node.js Express.',
+        format: 'markdown',
+      },
+    ],
+    draftTasks: [
+      {
+        name: 'Initialize Git Repository',
+        priority: 'High',
+        phase: 'Planning',
+      },
+    ],
+  });
+  const { base, close } = await makeServer({ askLLM: fake });
+  await createUser('lead2@team.test', 'pw123456');
+  const { cookie } = await login(base, 'lead2@team.test', 'pw123456');
+
+  const res = await fetch(base + '/api/copilot', authed(cookie, 'POST', {
+    question: 'ผมให้คุณสร้าง project webapp example tasks , document , knowledge ต่างๆ ให้',
+  }));
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.ok(data.draftProject);
+  assert.equal(data.draftProject.name, 'WebApp Example');
+  assert.ok(Array.isArray(data.draftArticles));
+  assert.equal(data.draftArticles.length, 1);
+  assert.equal(data.draftArticles[0].name, 'Architecture Overview');
+  assert.ok(Array.isArray(data.draftTasks));
+  assert.equal(data.draftTasks.length, 1);
+  assert.equal(data.draftTasks[0].name, 'Initialize Git Repository');
+  // Task automatically inherited the drafted project name
+  assert.equal(data.draftTasks[0].projectName, 'WebApp Example');
+  await close();
+});
+
+

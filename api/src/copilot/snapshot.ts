@@ -27,7 +27,6 @@ export async function buildSnapshot(prisma: PrismaClient): Promise<string> {
       where: { isActive: true },
       select: {
         name: true,
-        email: true,
         title: true,
         role: true,
         _count: { select: { tasks: { where: { status: { not: 'Done' } } } } },
@@ -79,7 +78,7 @@ export async function buildSnapshot(prisma: PrismaClient): Promise<string> {
       (users
         .map((u) => {
           const load = Math.min(100, (u._count?.tasks ?? 0) * 20);
-          return `- ${u.name} (${u.role}${u.title ? `, ${u.title}` : ''}) [Workload: ${load}%, Active Tasks: ${u._count?.tasks ?? 0}] Email: ${u.email}`;
+          return `- ${u.name} (${u.role}${u.title ? `, ${u.title}` : ''}) [Workload: ${load}%, Active Tasks: ${u._count?.tasks ?? 0}]`;
         })
         .join('\n') || '- (none)'),
   );

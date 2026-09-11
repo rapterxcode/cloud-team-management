@@ -24,22 +24,56 @@ export async function seed(prisma: PrismaClient) {
 
   const adminEmail = (process.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
   const adminPassword = process.env.ADMIN_PASSWORD ?? '';
+  let adminUserId = '';
   const activeAdmins = await prisma.user.count({ where: { role: 'admin', isActive: true } });
   if (activeAdmins === 0 && adminEmail && adminPassword) {
-    await prisma.user.upsert({
+    const adminUser = await prisma.user.upsert({
       where: { email: adminEmail },
       update: { role: 'admin', isActive: true },
       create: { email: adminEmail, name: 'Administrator', role: 'admin', passwordHash: await hashPassword(adminPassword) },
+    });
+    adminUserId = adminUser.id;
+  }
+
+  // Ensure default workspace exists
+  const defaultWsId = 'default-workspace-engineering';
+  await prisma.workspace.upsert({
+    where: { id: defaultWsId },
+    update: {},
+    create: {
+      id: defaultWsId,
+      name: 'Cloud workspace',
+      type: 'engineering',
+      description: 'Core engineering & platform delivery workspace',
+      color: 'purple',
+      icon: 'Cloud',
+    },
+  });
+
+  // Link seeded users to default workspace
+  for (const [name, uid] of Object.entries(users)) {
+    const role = name.includes('Auditor') ? 'auditor' : name.includes('Lead') ? 'lead' : 'member';
+    await prisma.workspaceMember.upsert({
+      where: { workspaceId_userId: { workspaceId: defaultWsId, userId: uid } },
+      update: {},
+      create: { workspaceId: defaultWsId, userId: uid, role },
+    });
+  }
+  if (adminUserId) {
+    await prisma.workspaceMember.upsert({
+      where: { workspaceId_userId: { workspaceId: defaultWsId, userId: adminUserId } },
+      update: {},
+      create: { workspaceId: defaultWsId, userId: adminUserId, role: 'admin' },
     });
   }
 
   if ((await prisma.project.count()) === 0) {
     const projects = [
-      { name: 'Data Center Consolidation & Hybrid Cloud Setup 2025', description: 'Migrated 40+ legacy on-prem workloads to AWS & GCP hybrid network.', status: 'Completed', progress: 100, department: 'Infrastructure', due: 'Dec 2025', color: 'purple', year: 2025 },
-      { name: 'Cloud infrastructure migration', description: 'A stronger foundation for what’s next.', status: 'On track', progress: 72, department: 'Platform', due: 'Sep 18', color: 'purple', year: 2026 },
-      { name: 'Developer experience', description: 'Making every deployment feel effortless.', status: 'On track', progress: 48, department: 'Engineering', due: 'Sep 24', color: 'blue', year: 2026 },
-      { name: 'Observability rollout', description: 'Clarity across every service and signal.', status: 'At risk', progress: 35, department: 'DevOps', due: 'Sep 12', color: 'orange', year: 2026 },
-      { name: 'AI-Powered Fraud Detection & Multi-Region Resiliency 2027', description: 'Next-gen real-time fraud scoring and cross-region active-active failover.', status: 'New', progress: 0, department: 'Security & AI', due: 'Q2 2027', color: 'blue', year: 2027 },
+      { workspaceId: defaultWsId, name: 'Data Center Consolidation & Hybrid Cloud Setup 2025', description: 'Migrated 40+ legacy on-prem workloads to AWS & GCP hybrid network.', status: 'Completed', progress: 100, department: 'Infrastructure', due: 'Dec 2025', color: 'purple', year: 2025 },
+      { workspaceId: defaultWsId, name: 'Cloud infrastructure migration', description: 'A stronger foundation for what’s next.', status: 'On track', progress: 72, department: 'Platform', due: 'Sep 18', color: 'purple', year: 2026 },
+      { workspaceId: defaultWsId, name: 'Developer experience', description: 'Making every deployment feel effortless.', status: 'On track', progress: 48, department: 'Engineering', due: 'Sep 24', color: 'blue', year: 2026 },
+      { workspaceId: defaultWsId, name: 'Observability rollout', description: 'Clarity across every service and signal.', status: 'At risk', progress: 35, department: 'DevOps', due: 'Sep 12', color: 'orange', year: 2026 },
+      { workspaceId: defaultWsId, name: 'AI-Powered Fraud Detection & Multi-Region Resiliency 2027', description: 'Next-gen real-time fraud scoring and cross-region active-active failover.', status: 'New', progress: 0, department: 'Security & AI', due: 'Q2 2027', color: 'blue', year: 2027 },
     ];
     const ids: string[] = [];
     for (const p of projects) ids.push((await prisma.project.create({ data: p })).id);

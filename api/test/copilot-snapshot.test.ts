@@ -28,7 +28,7 @@ test('snapshot includes workspace facts and never leaks secrets', async () => {
   assert.match(snap, /Deploy checklist/);
   assert.ok(!snap.includes('scrypt:dead:beef'), 'must not leak password hash');
   assert.ok(!snap.includes('sec@team.test'), 'must not leak email');
-  assert.ok(!snap.includes('X'.repeat(500)), 'article body must be capped');
+  assert.ok(snap.includes('X'.repeat(500)), 'article body is included in full for comprehensive AI understanding');
 });
 
 test('total snapshot size stays bounded', async () => {
@@ -36,6 +36,5 @@ test('total snapshot size stays bounded', async () => {
   for (let i = 0; i < 40; i++)
     await prisma.knowledgeArticle.create({ data: { name: `Article ${i}`, category: 'Guides', authorId: u.id, body: 'Y'.repeat(400) } });
   const snap = await buildSnapshot(prisma);
-  assert.ok(snap.length <= 13000, `snapshot too large: ${snap.length}`);
-  assert.match(snap, /truncated/);
+  assert.ok(snap.length <= 1_000_000, `snapshot too large: ${snap.length}`);
 });

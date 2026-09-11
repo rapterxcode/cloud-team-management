@@ -94,9 +94,18 @@ _Avoid_: Chat summary, AI note
 A persistent, multi-turn AI chat session associated with a User and stored in the database (`copilot_conversations`), tracking full conversation history, user prompts, assistant answers, proposals, and execution states with support for multiple named conversation sessions.
 _Avoid_: Chat log, ephemeral chat
 
+**Workspace**:
+An isolated organizational unit (e.g. Engineering, Internal Audit, Cloud Governance) that groups Projects, Tasks, Documents, and Member rosters, switchable via `<div className="workspace">`.
+_Avoid_: Team, organization, tenant, room
 
+**Workspace member**:
+A binding between a User and a Workspace that defines their per-workspace role (`admin`, `lead`, `member`, `auditor`, `viewer`).
+_Avoid_: Member role, team association
 
+**Access log**:
+An immutable record capturing authentication events (`LOGIN_SUCCESS`, `LOGIN_FAILURE`, `LOGOUT`, `PASSWORD_CHANGE`) with client IP address, user-agent device string, and failure reasons under ISO 27001 / BOT security standards.
+_Avoid_: Auth log, signin record, login history
 
-
-
-
+**Audit log**:
+An append-only, immutable transaction record capturing all business entity mutations (CREATE, UPDATE, DELETE, ROLE_CHANGE) across Projects, Tasks, Documents, and Articles, storing the actor identity, action type, and JSON payload diff.
+_Avoid_: Activity log, change log, history table

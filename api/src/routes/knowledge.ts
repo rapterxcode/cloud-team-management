@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import type { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware.js';
 import { badRequest } from '../validate.js';
+import { recordAuditLog } from '../audit.js';
 
 export const ATTACHMENTS_DIR = () => process.env.ATTACHMENTS_DIR ?? './attachments-dev';
 
@@ -64,23 +65,23 @@ export function knowledgeRoutes(prisma: PrismaClient) {
       const existing = await prisma.knowledgeCategory.findUnique({ where: { id: req.params.id } });
       if (!existing) return res.status(404).json({ error: 'Category not found' });
 
-      const name = req.body?.name !== undefined ? String(req.body.name).trim() : undefined;
-      const color = req.body?.color !== undefined ? String(req.body.color).trim() : undefined;
-      const icon = req.body?.icon !== undefined ? String(req.body.icon).trim() : undefined;
+      const name = typeof req.body?.name === 'string' ? req.body.name.trim() : undefined;
+      const color = typeof req.body?.color === 'string' ? req.body.color.trim() : undefined;
+      const icon = typeof req.body?.icon === 'string' ? req.body.icon.trim() : undefined;
 
       if (name !== undefined && !name) throw badRequest('Category name cannot be blank');
 
       if (name && name !== existing.name) {
-        const dup = await prisma.knowledgeCategory.findUnique({ where: { name } });
-        if (dup) throw badRequest('A category with this name already exists');
+        const duplicate = await prisma.knowledgeCategory.findUnique({ where: { name } });
+        if (duplicate) throw badRequest('A category with this name already exists');
       }
 
       const updated = await prisma.knowledgeCategory.update({
         where: { id: req.params.id },
         data: {
-          ...(name ? { name } : {}),
-          ...(color ? { color } : {}),
-          ...(icon ? { icon } : {}),
+          ...(name !== undefined ? { name } : {}),
+          ...(color !== undefined ? { color } : {}),
+          ...(icon !== undefined ? { icon } : {}),
         },
       });
 
@@ -112,9 +113,18 @@ export function knowledgeRoutes(prisma: PrismaClient) {
 
   // Articles endpoints
   r.get('/', async (req, res) => {
-    const { projectId } = req.query;
+    const { projectId, workspaceId } = req.query;
+    const where: any = {};
+    if (projectId) where.projectId = String(projectId);
+    if (workspaceId) {
+      where.OR = [
+        { isGlobal: true },
+        { workspaceId: String(workspaceId) },
+        { workspaceId: null },
+      ];
+    }
     res.json(await prisma.knowledgeArticle.findMany({ 
-      where: projectId ? { projectId: String(projectId) } : undefined,
+      where,
       include: INCLUDE, 
       orderBy: { createdAt: 'asc' } 
     }));
@@ -127,6 +137,8 @@ export function knowledgeRoutes(prisma: PrismaClient) {
       const category = String(req.body?.category ?? '').trim();
       const format = String(req.body?.format ?? 'markdown').toLowerCase().trim();
       const projectId = req.body?.projectId;
+      const workspaceId = req.body?.workspaceId ? String(req.body.workspaceId) : null;
+      const isGlobal = req.body?.isGlobal === true;
 
       if (!name) throw badRequest('A name is required');
       if (!body) throw badRequest('Content is required');
@@ -148,12 +160,27 @@ export function knowledgeRoutes(prisma: PrismaClient) {
           body,
           category,
           format,
+          isGlobal,
+          workspaceId,
           authorId: req.session.userId!,
           ...(projectId ? { projectId: String(projectId) } : {}),
           ...(chatHistory !== undefined ? { chatHistory } : {}),
         },
         include: INCLUDE,
       });
+
+      const actor = await prisma.user.findUnique({ where: { id: req.session.userId! } });
+      if (actor) {
+        await recordAuditLog(prisma, {
+          actor: { id: actor.id, name: actor.name, role: actor.role },
+          workspaceId: a.workspaceId,
+          action: 'CREATE',
+          entityType: 'KnowledgeArticle',
+          entityId: a.id,
+          details: { name: a.name, category: a.category, isGlobal: a.isGlobal },
+        });
+      }
+
       res.status(201).json(a);
     } catch (e) { next(e); }
   });
@@ -162,7 +189,7 @@ export function knowledgeRoutes(prisma: PrismaClient) {
     try {
       const existing = await prisma.knowledgeArticle.findUnique({ where: { id: req.params.id } });
       if (!existing) return res.status(404).json({ error: 'Article not found' });
-      const { name, category, body, projectId, format, chatHistory } = req.body ?? {};
+      const { name, category, body, projectId, format, chatHistory, workspaceId, isGlobal } = req.body ?? {};
 
       if (name !== undefined && !String(name).trim()) throw badRequest('A name is required');
       if (body !== undefined && !String(body).trim()) throw badRequest('Content is required');
@@ -189,10 +216,25 @@ export function knowledgeRoutes(prisma: PrismaClient) {
           ...(body !== undefined ? { body: String(body).trim() } : {}),
           ...(format !== undefined ? { format: String(format).toLowerCase().trim() } : {}),
           ...(projectId !== undefined ? { projectId: projectId ? String(projectId) : null } : {}),
+          ...(workspaceId !== undefined ? { workspaceId: workspaceId ? String(workspaceId) : null } : {}),
+          ...(isGlobal !== undefined ? { isGlobal: Boolean(isGlobal) } : {}),
           ...(chatHistory !== undefined ? { chatHistory } : {}),
         },
         include: INCLUDE,
       });
+
+      const actor = await prisma.user.findUnique({ where: { id: req.session.userId! } });
+      if (actor) {
+        await recordAuditLog(prisma, {
+          actor: { id: actor.id, name: actor.name, role: actor.role },
+          workspaceId: a.workspaceId,
+          action: 'UPDATE',
+          entityType: 'KnowledgeArticle',
+          entityId: a.id,
+          details: { before: { name: existing.name, category: existing.category }, after: { name: a.name, category: a.category } },
+        });
+      }
+
       res.json(a);
     } catch (e) { next(e); }
   });
@@ -207,6 +249,19 @@ export function knowledgeRoutes(prisma: PrismaClient) {
     for (const att of existing.attachments) {
       await unlink(join(ATTACHMENTS_DIR(), att.storedName)).catch(() => {});
     }
+
+    const actor = await prisma.user.findUnique({ where: { id: req.session.userId! } });
+    if (actor) {
+      await recordAuditLog(prisma, {
+        actor: { id: actor.id, name: actor.name, role: actor.role },
+        workspaceId: existing.workspaceId,
+        action: 'DELETE',
+        entityType: 'KnowledgeArticle',
+        entityId: existing.id,
+        details: { name: existing.name },
+      });
+    }
+
     res.status(204).end();
   });
 

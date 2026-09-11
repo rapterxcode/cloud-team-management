@@ -541,3 +541,86 @@ User requested: "ทำเป็น conversations history ให้หน่อ�
 - Docker containers (`api`, `caddy`, `postgres`, `backup`): Healthy.
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+
+---
+
+## AI Copilot Multi-Format File Uploads, Microsoft Office/Outlook Support & Gemini 3.8 Flash — 2026-09-11
+
+**Issue Addressed:**
+1. User requested: "อยากให้ ช่อง แชต กับ ai copilot สามารถ upload file , picture , และนามสกุลไฟล์ อื่นๆ ได้ มาประกอบในการ prompt ได้" (Support uploading files, images, and other file formats in Copilot prompt).
+2. User requested: "ฉัน update gemini model on .env ไป ช่วยอัพเดทให้ด้วย ครับ" (Updated Gemini model to `gemini-3.8-flash` in .env).
+3. User requested: "แล้วไฟล์ ประเภท microsoft ละ .xlsx powerpoint , word , outlook , .etc" (Support Microsoft Office `.xlsx`, `.docx`, `.pptx`, Outlook `.msg`/`.eml`, etc.).
+
+**Architecture & Implementation:**
+1. **Document Parser (`api/src/copilot/document-parser.ts`):**
+   - Implemented `parseAttachmentFile()` supporting:
+     - Images (`image/*`) & PDF (`application/pdf`) converted to Base64 `inlineData` for Gemini Multimodal.
+     - Microsoft Office (`.xlsx`, `.xls`, `.docx`, `.doc`, `.pptx`, `.ppt`) parsed via `officeparser` into structured Markdown tables and text.
+     - Outlook Messages (`.msg`) parsed via `@kenjiuno/msgreader` into structured email headers (Subject, From, To) and message body.
+     - Email files (`.eml`), code files, config (`.json`, `.yaml`, `.sql`), logs (`.log`), and text (`.txt`, `.md`) read as formatted UTF-8 sections.
+2. **Gemini 3.8 Flash Integration (`api/src/copilot/gemini.ts`, `compose.yml`):**
+   - Configured `GEMINI_MODEL=gemini-3.8-flash` across `compose.yml` and backend fallback.
+   - Updated `askLLM` to accept `attachments?: ChatAttachment[]` and map multimodal parts to Google GenAI content parts.
+3. **Storage & Route Governance (`api/src/routes/copilot.ts`):**
+   - Implemented `POST /api/copilot/upload` with multer disk storage to `/attachments`, max 15MB, restricted to authenticated non-auditor users.
+   - Implemented `GET /api/copilot/attachments/:storedName` with path traversal protection (`basename`).
+   - Persisted attachment metadata `{ storedName, originalName, mimeType, sizeBytes }` into PostgreSQL `copilot_conversations`.
+4. **Rich UI & Interaction (`web/src/copilot.tsx`, `web/src/lib/copilot-helpers.mjs`):**
+   - Added Paperclip button (`📎`), hidden `<input type="file">` accepting all allowed formats.
+   - Added Drag & Drop visual overlay with dashed purple border and bounce animation on `<aside className="copilot-panel">`.
+   - Added Screenshot paste support via `onPaste` on textarea (`Ctrl+V` / `Cmd+V`).
+   - Added pending attachments preview strip with file category icons, size formatting, uploading spinner, and remove button (`✕`).
+   - Rendered attachments inside user message bubbles with image thumbnails, document cards, and download links.
+
+**Verification Evidence:**
+- **API Automated Tests:** `npm --prefix api test` -> **55/55 passed (100% green)**.
+- **Web Unit Tests:** `npm --prefix web test` -> **56/56 passed (100% green)**.
+- **Production Build:** `npm --prefix web run build` && `npm --prefix api run build` clean (0 errors).
+- **Docker Compose Rebuild:** `docker compose up -d --build` -> all containers healthy (`caddy`, `api`, `postgres`, `backup`).
+- **Live Health Check:** `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`.
+- **Live File Upload & Retrieval:** Uploaded and retrieved files through `/api/copilot/upload` and `/api/copilot/attachments/:storedName`.
+- **Live Multimodal Query with Gemini 3.8 Flash:** Prompted with attached `budget.txt`; Gemini 3.8 Flash accurately extracted the Q3 budget of 50,000 USD and answered in Thai.
+- **History Persistence:** Verified via `GET /api/copilot/conversations/:id` that attachment metadata and assistant responses are preserved across sessions.
+
+---
+
+## Multi-Workspace Switcher, Per-Workspace RBAC, Access/Audit Logs & User Profile Settings — 2026-09-11
+
+**Issue Addressed:**
+1. User requested interactive workspace dropdown replacing static `<div class="workspace">` with multi-tenant workspace isolation.
+2. User requested granular Team Management & RBAC (`admin`, `lead`, `member`, `auditor`, `viewer`).
+3. User requested Enterprise Access Logs (login/logout/failed attempts with client IP & user-agent) and Mutation Audit Logs with field-level JSON diffs and CSV export.
+4. User requested Profile User modal (`<div class="profile">`) with self-service profile editing, password changing, and recent 5 logins review.
+
+**Architecture & Implementation:**
+1. **Multi-Workspace Schema & Migration (`api/prisma/schema.prisma`):**
+   - Added models `Workspace` (slug, name, description, teamType), `WorkspaceMember` (workspaceId, userId, role, joinedAt), `AccessLog` (action, status, ipAddress, userAgent), and `AuditLog` (action, entityType, entityId, beforeJson, afterJson).
+   - Scoped `Project` and `KnowledgeArticle` to `workspaceId`.
+   - Executed zero-data-loss backfill migration `20260911161000_multi_workspace_rbac_logging` creating `default-workspace-engineering` and linking all preexisting entities.
+2. **Access & Audit Logging Service (`api/src/audit.ts`, `api/src/routes/logs.ts`):**
+   - Implemented `recordAccessLog()` tracking client IP, user-agent, action, and status.
+   - Implemented `recordAuditLog()` capturing entity mutation before/after snapshots for full traceability.
+   - Implemented `GET /api/logs/access` and `GET /api/logs/audit` with search, entity filtering, and streaming CSV export (`/api/logs/audit/export.csv`).
+   - Strictly read-only for auditors; zero deletion/update endpoints to guarantee tamper-resistance (ISO 27001 / BOT compliance).
+3. **Workspace Management API (`api/src/routes/workspaces.ts`):**
+   - Full CRUD for workspaces; member invite/role assignment.
+   - Protected against deleting default workspace and last admin removal.
+4. **User Profile & Security API (`api/src/routes/auth.ts`):**
+   - `PATCH /api/auth/me/profile`: Update name/title.
+   - `POST /api/auth/me/change-password`: Secure password change with current password verification and Argon2id hashing.
+   - `GET /api/auth/me/recent-logins`: Returns last 5 access log entries for current user.
+5. **Frontend UI Components (`web/src/`):**
+   - `<WorkspaceSwitcher />`: Interactive dropdown replacing static markup, displaying workspace list with team badges and "+ New Workspace" creation modal.
+   - `<UserProfileDialog />`: 3-tab modal for Profile Details, Password & Security, and Recent 5 Logins history.
+   - `<LogsViewer />`: Enterprise log viewer with tabbed Audit/Access logs, real-time filtering, visual JSON diff modal, and one-click CSV export.
+   - `web/src/lib/workspace-rbac.mjs`: Pure helper functions for role-based action permissions and log filtering with unit tests.
+
+**Verification Evidence:**
+- **API Automated Tests:** `npm --prefix api test` -> **61/61 passed (100% green)**.
+- **Web Unit Tests:** `npm --prefix web test` -> **60/60 passed (100% green)**.
+- **Production Compile:** `npm --prefix api run build` (tsc) & `npm --prefix web run build` (vite) clean with 0 errors.
+- **Docker Compose Deployment:** `docker compose up -d --build` -> all 4 services healthy (`api`, `caddy`, `postgres`, `backup`).
+- **Live Health Endpoint:** `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`.
+- **Data Integrity:** 100% backward compatible; all legacy projects, tasks, articles, and users preserved and linked to default workspace.
+
+

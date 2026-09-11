@@ -14,6 +14,8 @@ import { resourcesRoutes } from './routes/resources.js';
 import { copilotRoutes } from './routes/copilot.js';
 import { projectDocumentsRoutes } from './routes/project-documents.js';
 import { complianceRoutes } from './routes/compliance.js';
+import { workspacesRoutes } from './routes/workspaces.js';
+import { logsRoutes } from './routes/logs.js';
 import type { AskLLM } from './copilot/gemini.js';
 
 // One shared pool for the whole process. createApp() is called once per test
@@ -55,7 +57,6 @@ export function createApp(prisma: PrismaClient, opts: { askLLM?: AskLLM } = {}) 
         httpOnly: true,
         sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
-        maxAge: 30 * 24 * 60 * 60 * 1000,
       },
     }),
   );
@@ -71,6 +72,8 @@ export function createApp(prisma: PrismaClient, opts: { askLLM?: AskLLM } = {}) 
   app.use(requireAuditorReadOnly);
 
   app.use('/api/users', usersRoutes(prisma));
+  app.use('/api/workspaces', workspacesRoutes(prisma));
+  app.use('/api/logs', logsRoutes(prisma));
   app.use('/api/projects', projectsRoutes(prisma));
   app.use('/api/tasks', tasksRoutes(prisma));
   app.use('/api/knowledge', attachmentUploadRoutes(prisma));
@@ -80,7 +83,6 @@ export function createApp(prisma: PrismaClient, opts: { askLLM?: AskLLM } = {}) 
   app.use('/api/compliance', complianceRoutes(prisma));
   app.use('/api/resources', resourcesRoutes(prisma));
   app.use('/api/copilot', copilotRoutes(prisma, opts.askLLM));
-  // More routes mounted by later tasks.
 
   app.use((err: Error & { status?: number }, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
     res.status(err.status ?? 500).json({ error: err.message || 'Server error' });
