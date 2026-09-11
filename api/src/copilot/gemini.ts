@@ -25,6 +25,7 @@ export type ArticleDraft = {
 export type CopilotResult = {
   answer: string;
   draftTask?: TaskDraft;
+  draftTasks?: TaskDraft[];
   draftArticle?: ArticleDraft;
 };
 
@@ -49,7 +50,7 @@ const MODEL = () => process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 const draftTaskTool: FunctionDeclaration = {
   name: 'draftTask',
-  description: 'Draft a task to be added to a project when the user asks to create, schedule, or assign a task.',
+  description: 'Draft a single task to be added to a project when the user asks to create, schedule, or assign a single task.',
   parametersJsonSchema: {
     type: 'object',
     properties: {
@@ -63,6 +64,36 @@ const draftTaskTool: FunctionDeclaration = {
       description: { type: 'string', description: 'Detailed runbook notes, checklist, or instructions for the task' },
     },
     required: ['name'],
+  },
+};
+
+const draftTasksTool: FunctionDeclaration = {
+  name: 'draftTasks',
+  description:
+    'Draft multiple actionable tasks to be added to projects when the user asks to create, schedule, break down, or extract multiple tasks from instructions, runbooks, or plans.',
+  parametersJsonSchema: {
+    type: 'object',
+    properties: {
+      tasks: {
+        type: 'array',
+        description: 'Array of actionable task proposals',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Task name or title' },
+            projectName: { type: 'string', description: 'Target project name from workspace data' },
+            ownerName: { type: 'string', description: 'Assigned owner/member name from workspace data' },
+            phase: { type: 'string', description: 'Phase of the task (e.g. Planning, Development, Testing, Launch, Audit)' },
+            priority: { type: 'string', enum: ['Low', 'Medium', 'High'], description: 'Priority level' },
+            start: { type: 'string', description: 'Start date in YYYY-MM-DD format if specified' },
+            date: { type: 'string', description: 'Finish or due date in YYYY-MM-DD format if specified' },
+            description: { type: 'string', description: 'Detailed runbook notes, checklist, or instructions for the task' },
+          },
+          required: ['name'],
+        },
+      },
+    },
+    required: ['tasks'],
   },
 };
 
@@ -95,7 +126,7 @@ export const realAskLLM: AskLLM = async (system, messages, opts = {}) => {
   const toolChoice = opts.toolChoice || 'all';
   const tools: FunctionDeclaration[] = [];
   if (toolChoice === 'task' || toolChoice === 'all') {
-    tools.push(draftTaskTool);
+    tools.push(draftTaskTool, draftTasksTool);
   }
   if (toolChoice === 'article' || toolChoice === 'all') {
     tools.push(draftArticleTool);
@@ -112,9 +143,15 @@ export const realAskLLM: AskLLM = async (system, messages, opts = {}) => {
 
   const fnCall = res.functionCalls?.[0];
   let draftTask: TaskDraft | undefined;
+  let draftTasks: TaskDraft[] | undefined;
   let draftArticle: ArticleDraft | undefined;
   if (fnCall && fnCall.name === 'draftTask' && fnCall.args) {
     draftTask = fnCall.args as TaskDraft;
+  } else if (fnCall && fnCall.name === 'draftTasks' && fnCall.args) {
+    const rawTasks = (fnCall.args as { tasks?: TaskDraft[] })?.tasks;
+    if (Array.isArray(rawTasks)) {
+      draftTasks = rawTasks;
+    }
   } else if (fnCall && fnCall.name === 'draftArticle' && fnCall.args) {
     draftArticle = fnCall.args as ArticleDraft;
   }
@@ -128,14 +165,16 @@ export const realAskLLM: AskLLM = async (system, messages, opts = {}) => {
     }
   }
 
-  if (!answer && draftTask) {
+  if (!answer && draftTasks && draftTasks.length > 0) {
+    answer = `I've prepared ${draftTasks.length} task proposals. Please review and confirm below.`;
+  } else if (!answer && draftTask) {
     answer = `I've prepared a draft for "${draftTask.name}". Please review and confirm below.`;
   } else if (!answer && draftArticle) {
     answer = draftArticle.summary || `I've prepared a draft for "${draftArticle.name || 'the article'}". Please review and confirm below.`;
   }
-  if (!answer && !draftTask && !draftArticle) {
+  if (!answer && !draftTask && !draftTasks && !draftArticle) {
     throw new Error('Empty response from Gemini');
   }
 
-  return { answer, draftTask, draftArticle };
+  return { answer, draftTask, draftTasks, draftArticle };
 };

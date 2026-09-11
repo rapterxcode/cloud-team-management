@@ -433,3 +433,40 @@ User requested: "ควรมีการเก็บ chat history ด้วย�
 
 
 
+
+---
+
+## Agentic Workspace Copilot: Batch Task Extraction, Executive Reporting, and Direct Knowledge Hub Export — 2026-09-11
+
+**Issue Addressed:**
+Direction 1: "ต่อยอด AI Copilot ให้เป็น Agentic Assistant (ทำงานจริงได้มากกว่าแค่ตอบคำถาม)" (Batch tasks from runbooks/meetings, Executive reporting, rich markdown, and direct knowledge saving). ADR: `docs/adr/0009-agentic-copilot-batch-tasks-and-executive-reporting.md`.
+
+**Architecture & Implementation:**
+1. **Backend Gemini Function Calling (`draftTasksTool`):**
+   - Added `draftTasksTool` FunctionDeclaration in `api/src/copilot/gemini.ts` allowing the model to propose an array of structured tasks.
+   - Updated `api/src/routes/copilot.ts`:
+     - System prompt instructed to call `draftTasks` when multi-step tasks or runbook breakdowns are requested.
+     - Implemented `resolveTaskDraft` helper performing fuzzy matching on project and active user entities for all tasks in the array.
+     - Fully backward-compatible: single `draftTask` is wrapped into `draftTasks: [draftTask]`.
+2. **Frontend Pure Helpers & Tests:**
+   - Created `web/src/lib/copilot-helpers.mjs` with `COPILOT_QUICK_ACTIONS`, `normalizeBatchDraftTasks`, `extractReportTitle`, and `isSubstantiveReport`.
+   - Unit tests in `web/src/lib/copilot-helpers.test.mjs` (6/6 passing).
+3. **Frontend UI Components:**
+   - Upgraded `web/src/copilot.tsx` with:
+     - **Quick Action Chips**: 1-click execution for `📊 สรุปรายงานผู้บริหาร`, `⚠️ วิเคราะห์โครงการ At-Risk`, `👥 เช็คภาระงานทีม (Workload)`, and `📋 สกัด Tasks จาก Runbook`.
+     - **Rich Markdown Rendering**: Integrated `MarkdownViewer` for clean headings, tables, blockquotes, and code blocks with copy buttons.
+     - **BatchTaskDraftCard**: Renders multiple proposed tasks with expandable editing fields (name, project, owner, phase, priority, dates) and **"✓ Create All (N) Tasks"** batch creation.
+     - **Knowledge Hub Export**: Added **"📄 Save as Knowledge Article"** and **"📋 Copy Report"** buttons on substantive assistant reports.
+   - Restricts task/article creation for `role === 'auditor'` to preserve ISO 27001 / BOT Segregation of Duties.
+   - Updated `web/src/App.tsx` wiring `currentUser` and `onSaveArticle` callback.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **53/53 pass** (100% green).
+- `npm --prefix api run build`: Clean TypeScript compile (0 errors).
+- `npm --prefix web run build`: Clean TypeScript and Vite compile (0 errors).
+- Docker stack rebuilt via `docker compose up -d --build`:
+  - `cloud-team-management-api-1`: Healthy
+  - `cloud-team-management-caddy-1`: Healthy
+  - `cloud-team-management-postgres-1`: Healthy
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`

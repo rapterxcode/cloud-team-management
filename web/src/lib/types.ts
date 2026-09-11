@@ -34,6 +34,12 @@ export type TaskDraft = {
   description?: string;
 };
 
+export type CopilotResponse = {
+  answer: string;
+  draftTask?: TaskDraft;
+  draftTasks?: TaskDraft[];
+};
+
 export const withDue = (t: ApiTask): Task => ({ ...t, due: t.date || 'Not set', ownerName: t.owner.name });
 
 export type AuditCategory = 'CR' | 'CC' | 'CRA' | 'Diagram' | 'RBAC' | 'TestEvidence' | 'General';

@@ -108,3 +108,46 @@ test('POST /api/copilot returns draftTask with resolved project and owner IDs', 
   assert.equal(data.draftTask.description, 'Run deployment checklist');
   await close();
 });
+
+test('POST /api/copilot returns draftTasks array with resolved projects and owners for batch tasks', async () => {
+  const fake: AskLLM = async () => ({
+    answer: 'I have extracted 2 tasks from the runbook.',
+    draftTasks: [
+      {
+        name: 'Step 1: Backup database',
+        projectName: 'Platform Modern',
+        ownerName: 'Sam Ops',
+        priority: 'High',
+        phase: 'Planning',
+      },
+      {
+        name: 'Step 2: Apply schema migration',
+        projectName: 'Platform Modern',
+        ownerName: 'Sam Ops',
+        priority: 'High',
+        phase: 'Development',
+      },
+    ],
+  });
+  const { base, close } = await makeServer({ askLLM: fake });
+  const sam = await createUser('sam2@team.test', 'pw123456', 'member', { name: 'Sam Ops' });
+  const proj = await prisma.project.create({ data: { name: 'Platform Modernization' } });
+  const { cookie } = await login(base, 'sam2@team.test', 'pw123456');
+
+  const res = await fetch(base + '/api/copilot', authed(cookie, 'POST', { question: 'Extract tasks from runbook' }));
+  assert.equal(res.status, 200);
+  const data = await res.json();
+  assert.equal(data.answer, 'I have extracted 2 tasks from the runbook.');
+  assert.ok(Array.isArray(data.draftTasks));
+  assert.equal(data.draftTasks.length, 2);
+  assert.equal(data.draftTasks[0].name, 'Step 1: Backup database');
+  assert.equal(data.draftTasks[0].projectId, proj.id);
+  assert.equal(data.draftTasks[0].ownerId, sam.id);
+  assert.equal(data.draftTasks[1].name, 'Step 2: Apply schema migration');
+  assert.equal(data.draftTasks[1].projectId, proj.id);
+  assert.equal(data.draftTasks[1].ownerId, sam.id);
+  // Also verifies backward-compatibility single draftTask is present
+  assert.equal(data.draftTask.name, 'Step 1: Backup database');
+  await close();
+});
+

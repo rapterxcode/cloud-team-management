@@ -82,6 +82,15 @@ _Avoid_: Bulk uploader, file sync
 An in-editor AI co-author powered by Gemini and grounded in live workspace context (projects, resources, roster) that drafts new Knowledge articles, refines existing documentation, enhances formatting (checklists, code blocks, tables), and transforms Markdown into interactive HTML pages with user-in-the-loop review.
 _Avoid_: Auto-writer, bot generator
 
+**Batch task proposal**:
+A collection of structured, actionable task drafts extracted or generated simultaneously by Copilot (e.g. from an incident runbook, meeting summary, or project plan), enabling side-by-side review and one-click batch creation into the workspace.
+_Avoid_: Task list dump, bulk importer
+
+**Executive workspace report**:
+An AI-synthesized executive summary aggregating live project progress, critical/at-risk milestones, workload distribution, and regulatory compliance status, exportable directly to markdown or a Knowledge article.
+_Avoid_: Chat summary, AI note
+
+
 
 
 
