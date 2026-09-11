@@ -55,7 +55,7 @@ export default function ArticleEditorDialog({
   const [projectId, setProjectId] = useState('');
   const [format, setFormat] = useState<'markdown' | 'html'>('markdown');
   const [body, setBody] = useState('');
-  const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview'>('split');
+  const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview' | 'ai-chat'>('split');
   const [copilotOpen, setCopilotOpen] = useState(true);
   const [previousState, setPreviousState] = useState<{
     name: string;
@@ -227,21 +227,22 @@ export default function ArticleEditorDialog({
                   <button
                     type="button"
                     onClick={() => {
+                      if (viewMode !== 'ai-chat') {
+                        setViewMode('ai-chat');
+                      } else {
+                        setViewMode('split');
+                      }
                       setCopilotOpen(true);
-                      setTimeout(() => {
-                        document.getElementById('article-copilot-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                        document.getElementById('article-copilot-input')?.focus();
-                      }, 50);
                     }}
                     className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      copilotOpen
+                      viewMode === 'ai-chat'
                         ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
                         : 'bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
                     }`}
-                    title="เปิดกล่องแชท AI Copilot และเลื่อนหาช่องพิมพ์ทันที"
+                    title={viewMode === 'ai-chat' ? 'สลับกลับไปยัง Editor View' : 'เปิดโหมด AI Chat Workspace (เต็มพื้นที่หน้าจอ)'}
                   >
-                    <Sparkles size={13} className={copilotOpen ? 'text-white' : 'text-purple-600'} />
-                    <span>AI Chat</span>
+                    <Sparkles size={13} className={viewMode === 'ai-chat' ? 'text-white' : 'text-purple-600'} />
+                    <span>{viewMode === 'ai-chat' ? 'Editor View' : 'AI Chat (เต็มจอ)'}</span>
                   </button>
                 )}
 
@@ -272,6 +273,21 @@ export default function ArticleEditorDialog({
                     <Columns size={13} />
                     <span>Split View</span>
                   </button>
+                  {currentUser?.role !== 'auditor' && (
+                    <button
+                      type="button"
+                      onClick={() => setViewMode('ai-chat')}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors ${
+                        viewMode === 'ai-chat'
+                          ? 'bg-purple-600 text-white font-bold shadow-xs'
+                          : 'text-purple-700 hover:text-purple-900 hover:bg-purple-50 dark:text-purple-300'
+                      }`}
+                      title="Full-Height AI Chat Workspace"
+                    >
+                      <Sparkles size={13} className={viewMode === 'ai-chat' ? 'text-white' : 'text-purple-600'} />
+                      <span>AI Chat Workspace</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setViewMode('preview')}
@@ -354,47 +370,91 @@ export default function ArticleEditorDialog({
               </div>
             </div>
 
-            {/* In-Editor AI Copilot Assistant */}
-            <ArticleCopilotAssistant
-              currentTitle={name}
-              currentCategory={category}
-              currentFormat={format}
-              currentBody={body}
-              currentUser={currentUser}
-              isOpen={copilotOpen}
-              onToggleOpen={setCopilotOpen}
-              canRevert={!!previousState}
-              onRevert={() => {
-                if (previousState) {
-                  setName(previousState.name);
-                  setBody(previousState.body);
-                  setFormat(previousState.format);
-                  setPreviousState(null);
-                }
-              }}
-              onApply={(draft, mode = 'replace') => {
-                setPreviousState({ name, body, format });
-                // Only adopt draft title if user hasn't set their own custom title yet
-                if (draft.name && draft.name !== 'Draft Article' && !name.trim()) {
-                  setName(draft.name);
-                }
-                if (mode === 'append') {
-                  setBody((prev) => (prev ? prev.trimEnd() + '\n\n' + draft.body : draft.body));
-                } else {
-                  setBody(draft.body);
-                }
-                if (draft.format) setFormat(draft.format);
-                if (viewMode === 'preview') setViewMode('split');
-              }}
-            />
+            {/* When in AI Chat Workspace Mode: Dedicated Full-Height View */}
+            {viewMode === 'ai-chat' && (
+              <div className="flex-1 flex flex-col min-h-[620px] mt-2">
+                <ArticleCopilotAssistant
+                  currentTitle={name}
+                  currentCategory={category}
+                  currentFormat={format}
+                  currentBody={body}
+                  currentUser={currentUser}
+                  isOpen={true}
+                  isFullWorkspace={true}
+                  onToggleFullWorkspace={() => setViewMode('split')}
+                  canRevert={!!previousState}
+                  onRevert={() => {
+                    if (previousState) {
+                      setName(previousState.name);
+                      setBody(previousState.body);
+                      setFormat(previousState.format);
+                      setPreviousState(null);
+                    }
+                  }}
+                  onApply={(draft, mode = 'replace') => {
+                    setPreviousState({ name, body, format });
+                    if (draft.name && draft.name !== 'Draft Article' && !name.trim()) {
+                      setName(draft.name);
+                    }
+                    if (mode === 'append') {
+                      setBody((prev) => (prev ? prev.trimEnd() + '\n\n' + draft.body : draft.body));
+                    } else {
+                      setBody(draft.body);
+                    }
+                    if (draft.format) setFormat(draft.format);
+                    setViewMode('split');
+                  }}
+                />
+              </div>
+            )}
 
-            {/* Formatting Toolbar */}
-            <EditorToolbar
-              format={format}
-              onFormatChange={setFormat}
-              onInsert={handleInsert}
-              onImportDoc={handleImportDoc}
-            />
+            {/* In-Editor AI Copilot Assistant & Toolbar (When in regular editor modes) */}
+            {viewMode !== 'ai-chat' && (
+              <>
+                <ArticleCopilotAssistant
+                  currentTitle={name}
+                  currentCategory={category}
+                  currentFormat={format}
+                  currentBody={body}
+                  currentUser={currentUser}
+                  isOpen={copilotOpen}
+                  onToggleOpen={setCopilotOpen}
+                  isFullWorkspace={false}
+                  onToggleFullWorkspace={() => setViewMode('ai-chat')}
+                  canRevert={!!previousState}
+                  onRevert={() => {
+                    if (previousState) {
+                      setName(previousState.name);
+                      setBody(previousState.body);
+                      setFormat(previousState.format);
+                      setPreviousState(null);
+                    }
+                  }}
+                  onApply={(draft, mode = 'replace') => {
+                    setPreviousState({ name, body, format });
+                    // Only adopt draft title if user hasn't set their own custom title yet
+                    if (draft.name && draft.name !== 'Draft Article' && !name.trim()) {
+                      setName(draft.name);
+                    }
+                    if (mode === 'append') {
+                      setBody((prev) => (prev ? prev.trimEnd() + '\n\n' + draft.body : draft.body));
+                    } else {
+                      setBody(draft.body);
+                    }
+                    if (draft.format) setFormat(draft.format);
+                    if (viewMode === 'preview') setViewMode('split');
+                  }}
+                />
+
+                {/* Formatting Toolbar */}
+                <EditorToolbar
+                  format={format}
+                  onFormatChange={setFormat}
+                  onInsert={handleInsert}
+                  onImportDoc={handleImportDoc}
+                />
+              </>
+            )}
 
             {/* Editor & Preview Workspace */}
             {viewMode === 'split' && (
