@@ -93,6 +93,7 @@ export default function ArticleEditorDialog({
       }
       setPreviousState(null);
       setError(null);
+      setCopilotOpen(true);
       // Auto-select split view on wide desktop, write on smaller screens
       if (typeof window !== 'undefined' && window.innerWidth < 960) {
         setViewMode('write');
@@ -226,21 +227,18 @@ export default function ArticleEditorDialog({
                   <button
                     type="button"
                     onClick={() => {
-                      const next = !copilotOpen;
-                      setCopilotOpen(next);
-                      if (next) {
-                        setTimeout(() => {
-                          document.getElementById('article-copilot-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                          document.getElementById('article-copilot-input')?.focus();
-                        }, 50);
-                      }
+                      setCopilotOpen(true);
+                      setTimeout(() => {
+                        document.getElementById('article-copilot-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        document.getElementById('article-copilot-input')?.focus();
+                      }, 50);
                     }}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                       copilotOpen
                         ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
                         : 'bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
                     }`}
-                    title={copilotOpen ? 'Minimize AI Chat' : 'Open AI Chat'}
+                    title="เปิดกล่องแชท AI Copilot และเลื่อนหาช่องพิมพ์ทันที"
                   >
                     <Sparkles size={13} className={copilotOpen ? 'text-white' : 'text-purple-600'} />
                     <span>AI Chat</span>
