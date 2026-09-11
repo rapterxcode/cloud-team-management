@@ -62,4 +62,22 @@ _Avoid_: Audit dashboard, compliance report
 The percentage capacity utilized by a User, derived dynamically from the count of active, incomplete Tasks they currently own.
 _Avoid_: Bandwidth, effort, story points, logged hours
 
+**Table of Contents (TOC)**:
+An interactive outline extracted dynamically from Markdown headings (H1–H3) of a Knowledge article, providing rapid anchor jumps and scrollspy tracking during runbook and SOP review.
+_Avoid_: Index, header list, outline tree
+
+**Interactive HTML page**:
+A Knowledge article format supporting HTML, CSS, and client-side JavaScript executed inside an isolated, secure sandboxed iframe to render interactive tools, calculators, and rich visual documentation safely without privilege escalation.
+_Avoid_: Custom widget, embedded site
+
+**Knowledge category**:
+A dynamic organizational taxonomy for classifying Knowledge articles (e.g. Guides, Runbooks, Security SOPs, Architecture) that can be created, edited, customized, and filtered across the platform.
+_Avoid_: Tag, topic label
+
+**Knowledge document importer**:
+A document intake workflow that reads uploaded `.md`, `.html`, or `.txt` files directly into a Knowledge article with automatic title and format extraction.
+_Avoid_: Bulk uploader, file sync
+
+
+
 
