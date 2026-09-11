@@ -16,6 +16,8 @@ import {
   Trash2,
   MessageSquare,
   Clock,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { api, post, destroy } from '@/lib/api';
 import type {
@@ -401,6 +403,47 @@ export default function CopilotPanel({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // Resizing and full-screen state
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('ctm_copilot_panel_width');
+      return saved ? Math.max(380, Math.min(window.innerWidth, parseInt(saved, 10))) : 480;
+    } catch {
+      return 480;
+    }
+  });
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Calculate panel width from viewport right edge
+      const newWidth = Math.max(380, Math.min(window.innerWidth, window.innerWidth - e.clientX));
+      setPanelWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('ctm_copilot_panel_width', panelWidth.toString());
+    } catch {
+      // ignore
+    }
+  }, [panelWidth]);
+
   const fetchConversations = async () => {
     try {
       const list = await api<CopilotConversationSummary[]>('/copilot/conversations');
@@ -553,7 +596,31 @@ export default function CopilotPanel({
 
   return (
     <div className="copilot-scrim" onClick={onClose}>
-      <aside className="copilot-panel relative" onClick={(e) => e.stopPropagation()} aria-label="AI Copilot">
+      <aside
+        className={`copilot-panel relative ${isDragging ? 'is-resizing' : ''} ${isMaximized ? 'is-maximized' : ''}`}
+        style={{
+          width: isMaximized ? '100vw' : `${panelWidth}px`,
+          maxWidth: '100vw',
+        }}
+        onClick={(e) => e.stopPropagation()}
+        aria-label="AI Copilot"
+      >
+        {/* Left Drag-to-Resize Handle */}
+        {!isMaximized && (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            className={`absolute left-0 top-0 bottom-0 w-2.5 cursor-col-resize z-30 group flex items-center justify-center -translate-x-1 hover:bg-purple-500/30 transition-colors select-none ${
+              isDragging ? 'bg-purple-600/60' : ''
+            }`}
+            title="คลิกลากเพื่อยืดหรือหดหน้าต่าง Copilot (Drag to resize)"
+          >
+            <div className="w-1 h-8 rounded-full bg-slate-300 dark:bg-slate-600 group-hover:bg-purple-500 group-active:bg-purple-600 transition-colors" />
+          </div>
+        )}
+
         <header className="copilot-head flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="brand-icon"><Sparkles size={18} /></span>
@@ -595,6 +662,16 @@ export default function CopilotPanel({
                   {conversations.length}
                 </span>
               )}
+            </button>
+
+            {/* Maximize / Restore Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsMaximized(!isMaximized)}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title={isMaximized ? 'ย่อกลับขนาดเดิม (Restore)' : 'ขยายเต็มจอ (Maximize)'}
+            >
+              {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
             </button>
 
             <button aria-label="Close" className="text-button p-1" onClick={onClose}>
