@@ -43,6 +43,8 @@ dist/
 
 # api local dev/test uploads
 attachments-dev/
+attachments/*
+!attachments/.gitkeep
 
 # worktrees and superpowers
 .worktrees

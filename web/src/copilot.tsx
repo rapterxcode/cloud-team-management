@@ -18,15 +18,30 @@ import {
   Clock,
   Maximize2,
   Minimize2,
+  Paperclip,
+  FileText,
+  FileSpreadsheet,
+  FileCode,
+  FileImage,
+  Mail,
+  File,
+  Loader2,
+  Download,
+  Upload,
 } from 'lucide-react';
 import { api, post, destroy } from '@/lib/api';
 import type {
   ApiTask,
   TaskDraft,
+  ProjectDraft,
+  ArticleDraft,
+  Project,
+  Article,
   Me,
   CopilotResponse,
   CopilotConversationSummary,
   CopilotConversationDetail,
+  CopilotAttachment,
 } from '@/lib/types';
 import MarkdownViewer from './markdown-viewer';
 import {
@@ -35,23 +50,558 @@ import {
   extractReportTitle,
   isSubstantiveReport,
   groupConversationsByDate,
+  formatFileSize,
+  getFileCategory,
 } from '@/lib/copilot-helpers.mjs';
 
 type Msg = {
   role: 'user' | 'assistant';
   content: string;
+  attachments?: CopilotAttachment[];
+  draftProject?: ProjectDraft;
+  draftArticles?: ArticleDraft[];
   draftTasks?: TaskDraft[];
   draftTask?: TaskDraft;
+  createdProject?: { id: string; name: string };
+  createdArticleMap?: Record<number, string>;
   createdTaskMap?: Record<number, string>;
   dismissed?: boolean;
+  projectDismissed?: boolean;
+  articlesDismissed?: boolean;
+  tasksDismissed?: boolean;
   savedAsArticle?: boolean;
 };
+
+type PendingAttachment = {
+  id: string;
+  file: File;
+  previewUrl?: string;
+  uploading: boolean;
+  error?: string;
+  uploaded?: CopilotAttachment;
+};
+
+function AttachmentIcon({ category, size = 15 }: { category: string; size?: number }) {
+  switch (category) {
+    case 'image':
+      return <FileImage size={size} className="text-emerald-500 shrink-0" />;
+    case 'excel':
+      return <FileSpreadsheet size={size} className="text-emerald-600 shrink-0" />;
+    case 'word':
+      return <FileText size={size} className="text-blue-600 shrink-0" />;
+    case 'powerpoint':
+      return <FileText size={size} className="text-orange-500 shrink-0" />;
+    case 'outlook':
+      return <Mail size={size} className="text-purple-600 shrink-0" />;
+    case 'code':
+      return <FileCode size={size} className="text-amber-500 shrink-0" />;
+    case 'pdf':
+      return <FileText size={size} className="text-rose-500 shrink-0" />;
+    default:
+      return <File size={size} className="text-slate-500 shrink-0" />;
+  }
+}
+
+function ProjectDraftCard({
+  draft,
+  currentUser,
+  createdProject,
+  onCreated,
+  onDismiss,
+}: {
+  draft: ProjectDraft;
+  currentUser?: Me | null;
+  createdProject?: { id: string; name: string };
+  onCreated: (proj: { id: string; name: string }) => Promise<void> | void;
+  onDismiss?: () => void;
+}) {
+  const isAuditor = currentUser?.role === 'auditor';
+  const [projectState, setProjectState] = useState<ProjectDraft>(draft);
+  const [isExpanded, setIsExpanded] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [created, setCreated] = useState<{ id: string; name: string } | null>(createdProject || null);
+  const [error, setError] = useState('');
+
+  const submitProject = async () => {
+    const name = String(projectState.name || '').trim();
+    if (!name) {
+      setError('Project name is required');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await post<Project>('/projects', {
+        name,
+        description: projectState.description || 'Project initiated via AI Copilot.',
+        year: Number(projectState.year) || 2026,
+        status: projectState.status || 'New',
+        due: projectState.due || undefined,
+      });
+      const createdObj = { id: res.id, name: res.name };
+      setCreated(createdObj);
+      await onCreated(createdObj);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not create project');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="task-draft-card border-blue-300 dark:border-blue-800 bg-white dark:bg-slate-900 shadow-md">
+      <div className="flex items-center justify-between pb-2 border-b border-blue-100 dark:border-blue-900/50">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-white shadow-xs">
+            <Sparkles size={13} />
+          </span>
+          <span className="font-semibold text-xs text-blue-900 dark:text-blue-300">
+            Project Proposal
+          </span>
+        </div>
+        {created && (
+          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+            <Check size={12} /> Project Created
+          </span>
+        )}
+      </div>
+
+      {isAuditor && (
+        <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs">
+          <ShieldAlert size={14} className="shrink-0" />
+          <span>Auditor Mode (Read-Only) — Project creation restricted under ISO 27001 / BOT SoD.</span>
+        </div>
+      )}
+
+      <div className="rounded-lg border border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/40 mt-1">
+        <div
+          className="flex items-center justify-between p-2.5 cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/80 rounded-t-lg select-none"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          <div className="flex items-center gap-2 min-w-0 pr-2">
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10.5px] font-semibold shrink-0 ${
+              created ? 'bg-emerald-600 text-white' : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+            }`}>
+              {created ? <Check size={11} /> : 'P'}
+            </span>
+            <strong className={`truncate font-medium text-slate-800 dark:text-slate-200 ${created ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>
+              {projectState.name || 'Untitled Project'}
+            </strong>
+            {projectState.status && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 shrink-0">
+                {projectState.status}
+              </span>
+            )}
+            {projectState.year && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 shrink-0">
+                {projectState.year}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {created ? (
+              <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-0.5">
+                <Check size={13} /> Active
+              </span>
+            ) : (
+              !isAuditor && (
+                <button
+                  type="button"
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-2xs"
+                  disabled={submitting}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    submitProject();
+                  }}
+                >
+                  {submitting ? 'Creating…' : 'Create Project'}
+                </button>
+              )
+            )}
+            <span className="text-slate-400 p-0.5">
+              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </span>
+          </div>
+        </div>
+
+        {isExpanded && (
+          <div className="p-3 border-t border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 rounded-b-lg flex flex-col gap-2.5">
+            <div className="task-draft-field">
+              <label>Project Name</label>
+              <input
+                value={projectState.name || ''}
+                disabled={Boolean(created) || isAuditor}
+                onChange={(e) => setProjectState({ ...projectState, name: e.target.value })}
+                placeholder="e.g. Platform Modernization"
+              />
+            </div>
+            <div className="task-draft-field">
+              <label>Description</label>
+              <textarea
+                value={projectState.description || ''}
+                disabled={Boolean(created) || isAuditor}
+                onChange={(e) => setProjectState({ ...projectState, description: e.target.value })}
+                placeholder="Project overview and objectives..."
+                rows={2}
+              />
+            </div>
+            <div className="task-draft-meta">
+              <div className="task-draft-field">
+                <label>Year</label>
+                <select
+                  value={String(projectState.year || 2026)}
+                  disabled={Boolean(created) || isAuditor}
+                  onChange={(e) => setProjectState({ ...projectState, year: Number(e.target.value) })}
+                >
+                  {['2024', '2025', '2026', '2027', '2028'].map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="task-draft-field">
+                <label>Status</label>
+                <select
+                  value={projectState.status || 'New'}
+                  disabled={Boolean(created) || isAuditor}
+                  onChange={(e) => setProjectState({ ...projectState, status: e.target.value })}
+                >
+                  {['New', 'On track', 'At risk', 'Completed'].map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="task-draft-field">
+                <label>Due Date</label>
+                <input
+                  type="date"
+                  value={projectState.due ? projectState.due.slice(0, 10) : ''}
+                  disabled={Boolean(created) || isAuditor}
+                  onChange={(e) => setProjectState({ ...projectState, due: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 p-2 rounded-md border border-rose-200 dark:border-rose-900">
+          <AlertCircle size={14} className="shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2 border-t border-blue-100 dark:border-blue-900/40 text-xs">
+        <span className="text-[11px] text-slate-500">
+          {created ? 'Project registered in workspace.' : 'Review details before initializing project.'}
+        </span>
+        <div className="flex items-center gap-2">
+          {onDismiss && !created && (
+            <button
+              type="button"
+              className="px-2.5 py-1 rounded text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              onClick={onDismiss}
+            >
+              Dismiss
+            </button>
+          )}
+          {!created && !isAuditor && (
+            <button
+              type="button"
+              disabled={submitting}
+              className="px-3 py-1 font-semibold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-2xs"
+              onClick={submitProject}
+            >
+              {submitting ? 'Creating Project…' : 'Create Project'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BatchArticleDraftCard({
+  drafts,
+  projects,
+  targetProjectId,
+  currentUser,
+  onCreated,
+  onDismiss,
+}: {
+  drafts: ArticleDraft[];
+  projects: { id: string; name: string }[];
+  targetProjectId?: string;
+  currentUser?: Me | null;
+  onCreated: (createdIndex: number, createdId: string) => Promise<void> | void;
+  onDismiss?: () => void;
+}) {
+  const isAuditor = currentUser?.role === 'auditor';
+  const [articlesState, setArticlesState] = useState<ArticleDraft[]>(drafts);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(drafts.length === 1 ? 0 : null);
+  const [createdMap, setCreatedMap] = useState<Record<number, string>>({});
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
+  const [individualSubmitting, setIndividualSubmitting] = useState<number | null>(null);
+  const [error, setError] = useState('');
+
+  const updateArticleField = (index: number, field: keyof ArticleDraft, value: string) => {
+    setArticlesState((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const submitSingle = async (index: number) => {
+    const a = articlesState[index];
+    if (!a) return;
+    const articleName = String(a.name || '').trim();
+    const articleBody = String(a.body || '').trim();
+    if (!articleName) {
+      setError(`Article #${index + 1} requires a title`);
+      return;
+    }
+    if (!articleBody) {
+      setError(`Article #${index + 1} has no content`);
+      return;
+    }
+
+    setIndividualSubmitting(index);
+    setError('');
+    try {
+      const res = await post<Article>('/knowledge', {
+        name: articleName,
+        body: articleBody,
+        category: a.category || 'Architecture',
+        format: a.format || 'markdown',
+        projectId: targetProjectId || undefined,
+      });
+      setCreatedMap((prev) => ({ ...prev, [index]: res.id }));
+      await onCreated(index, res.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save article');
+    } finally {
+      setIndividualSubmitting(null);
+    }
+  };
+
+  const submitAll = async () => {
+    setBatchSubmitting(true);
+    setError('');
+    try {
+      for (let i = 0; i < articlesState.length; i++) {
+        if (createdMap[i]) continue;
+        const a = articlesState[i];
+        const articleName = String(a.name || '').trim();
+        const articleBody = String(a.body || '').trim();
+        if (!articleName || !articleBody) continue;
+
+        const res = await post<Article>('/knowledge', {
+          name: articleName,
+          body: articleBody,
+          category: a.category || 'Architecture',
+          format: a.format || 'markdown',
+          projectId: targetProjectId || undefined,
+        });
+        setCreatedMap((prev) => ({ ...prev, [i]: res.id }));
+        await onCreated(i, res.id);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error occurred during batch creation');
+    } finally {
+      setBatchSubmitting(false);
+    }
+  };
+
+  const createdCount = Object.keys(createdMap).length;
+  const allCreated = createdCount === articlesState.length && articlesState.length > 0;
+
+  return (
+    <div className="task-draft-card border-emerald-300 dark:border-emerald-800 bg-white dark:bg-slate-900 shadow-md">
+      <div className="flex items-center justify-between pb-2 border-b border-emerald-100 dark:border-emerald-900/50">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-emerald-600 text-white shadow-xs">
+            <BookOpen size={13} />
+          </span>
+          <span className="font-semibold text-xs text-emerald-900 dark:text-emerald-300">
+            {articlesState.length > 1
+              ? `Knowledge & Runbook Proposals (${articlesState.length} items)`
+              : 'Knowledge Article Proposal'}
+          </span>
+        </div>
+        {createdCount > 0 && (
+          <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full flex items-center gap-1">
+            <Check size={12} /> {createdCount} / {articlesState.length} saved
+          </span>
+        )}
+      </div>
+
+      {isAuditor && (
+        <div className="flex items-center gap-2 p-2 rounded-md bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs">
+          <ShieldAlert size={14} className="shrink-0" />
+          <span>Auditor Mode (Read-Only) — Knowledge authoring restricted under ISO 27001 / BOT SoD.</span>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2.5 mt-1">
+        {articlesState.map((art, idx) => {
+          const isCreated = Boolean(createdMap[idx]);
+          const isExpanded = expandedIndex === idx;
+
+          return (
+            <div
+              key={idx}
+              className={`rounded-lg border transition-all text-xs ${
+                isCreated
+                  ? 'border-emerald-200 bg-emerald-50/40 dark:border-emerald-900/40 dark:bg-emerald-950/20'
+                  : 'border-slate-200 bg-slate-50/60 dark:border-slate-800 dark:bg-slate-800/40'
+              }`}
+            >
+              <div
+                className="flex items-center justify-between p-2.5 cursor-pointer hover:bg-slate-100/60 dark:hover:bg-slate-800/80 rounded-t-lg select-none"
+                onClick={() => setExpandedIndex(isExpanded ? null : idx)}
+              >
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10.5px] font-semibold shrink-0 ${
+                    isCreated ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                  }`}>
+                    {isCreated ? <Check size={11} /> : idx + 1}
+                  </span>
+                  <strong className={`truncate font-medium text-slate-800 dark:text-slate-200 ${isCreated ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>
+                    {art.name || 'Untitled document'}
+                  </strong>
+                  {art.category && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
+                      {art.category}
+                    </span>
+                  )}
+                  {art.format && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 shrink-0 uppercase">
+                      {art.format}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {isCreated ? (
+                    <span className="text-emerald-600 font-semibold text-[11px] flex items-center gap-0.5">
+                      <Check size={13} /> Saved
+                    </span>
+                  ) : (
+                    !isAuditor && (
+                      <button
+                        type="button"
+                        className="px-2 py-0.5 text-[11px] font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs"
+                        disabled={individualSubmitting === idx || batchSubmitting}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          submitSingle(idx);
+                        }}
+                      >
+                        {individualSubmitting === idx ? '…' : 'Save'}
+                      </button>
+                    )
+                  )}
+                  <span className="text-slate-400 p-0.5">
+                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  </span>
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div className="p-3 border-t border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 rounded-b-lg flex flex-col gap-2.5">
+                  <div className="task-draft-field">
+                    <label>Article Title</label>
+                    <input
+                      value={art.name || ''}
+                      disabled={isCreated || isAuditor}
+                      onChange={(e) => updateArticleField(idx, 'name', e.target.value)}
+                      placeholder="Title..."
+                    />
+                  </div>
+                  <div className="task-draft-meta">
+                    <div className="task-draft-field">
+                      <label>Category</label>
+                      <input
+                        value={art.category || 'Architecture'}
+                        disabled={isCreated || isAuditor}
+                        onChange={(e) => updateArticleField(idx, 'category', e.target.value)}
+                        placeholder="e.g. Architecture, SRE, DevSecOps"
+                      />
+                    </div>
+                    <div className="task-draft-field">
+                      <label>Format</label>
+                      <select
+                        value={art.format || 'markdown'}
+                        disabled={isCreated || isAuditor}
+                        onChange={(e) => updateArticleField(idx, 'format', e.target.value as 'markdown' | 'html')}
+                      >
+                        <option value="markdown">Markdown</option>
+                        <option value="html">Interactive HTML</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="task-draft-field">
+                    <label>Content Preview / Editor</label>
+                    <textarea
+                      value={art.body || ''}
+                      disabled={isCreated || isAuditor}
+                      onChange={(e) => updateArticleField(idx, 'body', e.target.value)}
+                      rows={4}
+                      className="font-mono text-[11px]"
+                      placeholder="Content..."
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {error && (
+        <div className="flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 p-2 rounded-md border border-rose-200 dark:border-rose-900">
+          <AlertCircle size={14} className="shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2 border-t border-emerald-100 dark:border-emerald-900/40 text-xs">
+        <span className="text-[11px] text-slate-500">
+          {allCreated ? 'All knowledge articles saved to hub.' : 'Review articles before publishing to Knowledge Hub.'}
+        </span>
+        <div className="flex items-center gap-2">
+          {onDismiss && !allCreated && (
+            <button
+              type="button"
+              className="px-2.5 py-1 rounded text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              onClick={onDismiss}
+            >
+              Dismiss
+            </button>
+          )}
+          {!allCreated && !isAuditor && articlesState.length > 1 && (
+            <button
+              type="button"
+              disabled={batchSubmitting || individualSubmitting !== null}
+              className="flex items-center gap-1 px-3 py-1 font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-2xs disabled:opacity-50"
+              onClick={submitAll}
+            >
+              <CheckCheck size={13} />
+              <span>{batchSubmitting ? 'Saving All…' : `Save All (${articlesState.length - createdCount}) Articles`}</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function BatchTaskDraftCard({
   drafts,
   projects,
   owners,
   currentUser,
+  targetProject,
   onCreated,
   onDismiss,
 }: {
@@ -59,6 +609,7 @@ function BatchTaskDraftCard({
   projects: { id: string; name: string }[];
   owners: { id: string; name: string }[];
   currentUser?: Me | null;
+  targetProject?: { id: string; name: string };
   onCreated: (createdIndex: number, createdId: string) => Promise<void> | void;
   onDismiss: () => void;
 }) {
@@ -69,6 +620,23 @@ function BatchTaskDraftCard({
   const [batchSubmitting, setBatchSubmitting] = useState(false);
   const [individualSubmitting, setIndividualSubmitting] = useState<number | null>(null);
   const [error, setError] = useState('');
+
+  const allProjects = targetProject && !projects.some((p) => p.id === targetProject.id)
+    ? [targetProject, ...projects]
+    : projects;
+
+  useEffect(() => {
+    if (targetProject) {
+      setTasksState((prev) =>
+        prev.map((t) => {
+          if (!t.projectId || t.projectName === targetProject.name) {
+            return { ...t, projectId: targetProject.id, projectName: targetProject.name };
+          }
+          return t;
+        })
+      );
+    }
+  }, [targetProject]);
 
   const updateTaskField = (index: number, field: keyof TaskDraft, value: string) => {
     setTasksState((prev) => {
@@ -86,7 +654,7 @@ function BatchTaskDraftCard({
       setError(`Task #${index + 1} requires a name`);
       return;
     }
-    const projectId = t.projectId || projects[0]?.id || '';
+    const projectId = t.projectId || targetProject?.id || allProjects[0]?.id || '';
     const ownerId = t.ownerId || owners[0]?.id || '';
     if (!projectId) {
       setError(`Choose a project for "${taskName}"`);
@@ -128,7 +696,7 @@ function BatchTaskDraftCard({
         const t = tasksState[i];
         const taskName = String(t.name || '').trim();
         if (!taskName) continue;
-        const projectId = t.projectId || projects[0]?.id || '';
+        const projectId = t.projectId || targetProject?.id || allProjects[0]?.id || '';
         const ownerId = t.ownerId || owners[0]?.id || '';
         if (!projectId || !ownerId) continue;
 
@@ -258,11 +826,11 @@ function BatchTaskDraftCard({
                     <div className="task-draft-field">
                       <label>Project</label>
                       <select
-                        value={task.projectId || projects[0]?.id || ''}
+                        value={task.projectId || targetProject?.id || allProjects[0]?.id || ''}
                         disabled={isCreated || isAuditor}
                         onChange={(e) => updateTaskField(idx, 'projectId', e.target.value)}
                       >
-                        {projects.map((p) => (
+                        {allProjects.map((p) => (
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                       </select>
@@ -377,6 +945,7 @@ export default function CopilotPanel({
   projects = [],
   owners = [],
   onTaskCreated,
+  onProjectCreated,
   currentUser,
   onSaveArticle,
 }: {
@@ -386,8 +955,9 @@ export default function CopilotPanel({
   projects?: { id: string; name: string }[];
   owners?: { id: string; name: string }[];
   onTaskCreated?: () => Promise<void> | void;
+  onProjectCreated?: () => Promise<void> | void;
   currentUser?: Me | null;
-  onSaveArticle?: (article: { name: string; body: string; category: string }) => Promise<void> | void;
+  onSaveArticle?: (article: { name: string; body: string; category: string; format?: 'markdown' | 'html' }) => Promise<void> | void;
 }) {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -444,6 +1014,82 @@ export default function CopilotPanel({
     }
   }, [panelWidth]);
 
+  // Attachments State
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    for (const file of fileArray) {
+      if (file.size > 15 * 1024 * 1024) {
+        alert(`ไฟล์ "${file.name}" มีขนาดเกิน 15 MB ไม่สามารถอัปโหลดได้`);
+        continue;
+      }
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const isImg = file.type.startsWith('image/');
+      const previewUrl = isImg ? URL.createObjectURL(file) : undefined;
+
+      const item: PendingAttachment = {
+        id,
+        file,
+        previewUrl,
+        uploading: true,
+      };
+
+      setPendingAttachments((prev) => [...prev, item]);
+
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await fetch('/api/copilot/upload', {
+          method: 'POST',
+          body: form,
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error || 'Upload failed');
+        }
+        const uploaded: CopilotAttachment = await res.json();
+        setPendingAttachments((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, uploading: false, uploaded } : p))
+        );
+      } catch (err: any) {
+        setPendingAttachments((prev) =>
+          prev.map((p) =>
+            p.id === id ? { ...p, uploading: false, error: err.message || 'Failed' } : p
+          )
+        );
+      }
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setPendingAttachments((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.id !== id);
+    });
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        const file = items[i].getAsFile();
+        if (file) files.push(file);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      handleUploadFiles(files);
+    }
+  };
+
   const fetchConversations = async () => {
     try {
       const list = await api<CopilotConversationSummary[]>('/copilot/conversations');
@@ -487,6 +1133,7 @@ export default function CopilotPanel({
       setActiveConvId(detail.id);
       const rawMsgs = Array.isArray(detail.messages) ? detail.messages : [];
       setMessages(rawMsgs);
+      setPendingAttachments([]);
       setHistoryOpen(false);
     } catch (e) {
       console.error('Failed to load conversation:', e);
@@ -499,6 +1146,7 @@ export default function CopilotPanel({
     setActiveConvId(null);
     setMessages([]);
     setInput('');
+    setPendingAttachments([]);
     setHistoryOpen(false);
   };
 
@@ -517,12 +1165,24 @@ export default function CopilotPanel({
   };
 
   const executeSend = async (questionText: string) => {
-    const question = questionText.trim();
+    const validAttachments = pendingAttachments
+      .filter((p) => p.uploaded)
+      .map((p) => p.uploaded!);
+
+    const question =
+      questionText.trim() ||
+      (validAttachments.length > 0 ? 'ช่วยวิเคราะห์ไฟล์และรูปภาพที่แนบมานี้ให้หน่อยครับ' : '');
     if (!question || busy) return;
+
     const history = messages.slice(-10).map((m) => ({ role: m.role, content: m.content }));
-    const newMsg: Msg = { role: 'user', content: question };
+    const newMsg: Msg = {
+      role: 'user',
+      content: question,
+      attachments: validAttachments.length > 0 ? validAttachments : undefined,
+    };
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
+    setPendingAttachments([]);
     setBusy(true);
 
     try {
@@ -530,12 +1190,15 @@ export default function CopilotPanel({
         question,
         history,
         conversationId: activeConvId || undefined,
+        attachments: validAttachments.length > 0 ? validAttachments : undefined,
       });
 
       const normalizedTasks = normalizeBatchDraftTasks(res.draftTasks, res.draftTask);
       const assistantMsg: Msg = {
         role: 'assistant',
         content: res.answer,
+        draftProject: res.draftProject,
+        draftArticles: res.draftArticles && res.draftArticles.length > 0 ? res.draftArticles : undefined,
         draftTasks: normalizedTasks.length > 0 ? normalizedTasks : undefined,
       };
 
@@ -603,8 +1266,38 @@ export default function CopilotPanel({
           maxWidth: '100vw',
         }}
         onClick={(e) => e.stopPropagation()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragOver(false);
+          if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            handleUploadFiles(e.dataTransfer.files);
+          }
+        }}
         aria-label="AI Copilot"
       >
+        {/* Drag & Drop Visual Overlay */}
+        {isDragOver && (
+          <div className="absolute inset-0 z-50 bg-purple-600/15 backdrop-blur-xs border-2 border-dashed border-purple-500 rounded-2xl flex flex-col items-center justify-center pointer-events-none p-6 text-center animate-in fade-in duration-150">
+            <div className="w-14 h-14 rounded-full bg-purple-100 dark:bg-purple-900/80 text-purple-600 dark:text-purple-300 flex items-center justify-center mb-3 shadow-md animate-bounce">
+              <Upload size={28} />
+            </div>
+            <p className="font-semibold text-slate-900 dark:text-slate-100 text-sm">วางไฟล์ที่นี่เพื่อแนบไปกับข้อความ</p>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 max-w-sm">
+              รองรับรูปภาพ, PDF, Excel (.xlsx), Word (.docx), PowerPoint (.pptx), Outlook (.msg/.eml), โค้ด และไฟล์ข้อความ (สูงสุด 15MB)
+            </p>
+          </div>
+        )}
         {/* Left Drag-to-Resize Handle */}
         {!isMaximized && (
           <div
@@ -833,15 +1526,132 @@ export default function CopilotPanel({
                   )}
                 </div>
               ) : (
-                <div>{m.content}</div>
+                <div className="flex flex-col gap-2">
+                  {m.attachments && m.attachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-1">
+                      {m.attachments.map((att, attIdx) => {
+                        const cat = getFileCategory(att.originalName, att.mimeType);
+                        const isImg = cat === 'image';
+                        return (
+                          <div
+                            key={attIdx}
+                            className="flex items-center gap-2 p-1.5 rounded-lg bg-white/95 dark:bg-slate-800/95 border border-purple-200 dark:border-purple-800 text-xs shadow-2xs max-w-full"
+                          >
+                            {isImg ? (
+                              <a
+                                href={`/api/copilot/attachments/${att.storedName}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="block shrink-0 overflow-hidden rounded border border-slate-200 dark:border-slate-700 hover:opacity-85"
+                              >
+                                <img
+                                  src={`/api/copilot/attachments/${att.storedName}`}
+                                  alt={att.originalName}
+                                  className="w-12 h-12 object-cover"
+                                />
+                              </a>
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center shrink-0">
+                                <AttachmentIcon category={cat} size={18} />
+                              </div>
+                            )}
+                            <div className="min-w-0 pr-1">
+                              <a
+                                href={`/api/copilot/attachments/${att.storedName}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="font-medium text-[11.5px] truncate block text-slate-800 dark:text-slate-200 hover:underline max-w-[150px]"
+                                title={att.originalName}
+                              >
+                                {att.originalName}
+                              </a>
+                              <span className="text-[10px] text-slate-400 block">
+                                {formatFileSize(att.sizeBytes)}
+                              </span>
+                            </div>
+                            <a
+                              href={`/api/copilot/attachments/${att.storedName}`}
+                              download={att.originalName}
+                              className="p-1 text-slate-400 hover:text-purple-600 transition-colors shrink-0"
+                              title="ดาวน์โหลดไฟล์"
+                            >
+                              <Download size={13} />
+                            </a>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {m.content && <div>{m.content}</div>}
+                </div>
               )}
 
-              {m.draftTasks && m.draftTasks.length > 0 && !m.dismissed && (
+              {/* Project Proposal Card */}
+              {m.draftProject && !m.projectDismissed && (
+                <ProjectDraftCard
+                  draft={m.draftProject}
+                  currentUser={currentUser}
+                  createdProject={m.createdProject}
+                  onCreated={async (newProj) => {
+                    setMessages((prev) =>
+                      prev.map((msg, mIdx) => {
+                        if (mIdx !== i) return msg;
+                        const updatedTasks = msg.draftTasks?.map((t) => {
+                          if (!t.projectId || t.projectName === newProj.name) {
+                            return { ...t, projectId: newProj.id, projectName: newProj.name };
+                          }
+                          return t;
+                        });
+                        return {
+                          ...msg,
+                          createdProject: newProj,
+                          draftTasks: updatedTasks,
+                        };
+                      })
+                    );
+                    await onProjectCreated?.();
+                  }}
+                  onDismiss={() => {
+                    setMessages((prev) =>
+                      prev.map((msg, mIdx) => (mIdx === i ? { ...msg, projectDismissed: true } : msg))
+                    );
+                  }}
+                />
+              )}
+
+              {/* Knowledge & Runbook Proposals Card */}
+              {m.draftArticles && m.draftArticles.length > 0 && !m.articlesDismissed && (
+                <BatchArticleDraftCard
+                  drafts={m.draftArticles}
+                  projects={projects}
+                  targetProjectId={m.createdProject?.id}
+                  currentUser={currentUser}
+                  onCreated={async (idx, id) => {
+                    setMessages((prev) =>
+                      prev.map((msg, mIdx) =>
+                        mIdx === i
+                          ? { ...msg, createdArticleMap: { ...(msg.createdArticleMap || {}), [idx]: id } }
+                          : msg
+                      )
+                    );
+                    await onProjectCreated?.();
+                  }}
+                  onDismiss={() => {
+                    setMessages((prev) =>
+                      prev.map((msg, mIdx) => (mIdx === i ? { ...msg, articlesDismissed: true } : msg))
+                    );
+                  }}
+                />
+              )}
+
+              {/* Task Proposals Card */}
+              {m.draftTasks && m.draftTasks.length > 0 && !m.tasksDismissed && !m.dismissed && (
                 <BatchTaskDraftCard
                   drafts={m.draftTasks}
                   projects={projects}
                   owners={owners}
                   currentUser={currentUser}
+                  targetProject={m.createdProject}
                   onCreated={async (idx, id) => {
                     setMessages((prev) =>
                       prev.map((msg, mIdx) =>
@@ -854,7 +1664,7 @@ export default function CopilotPanel({
                   }}
                   onDismiss={() => {
                     setMessages((prev) =>
-                      prev.map((msg, mIdx) => (mIdx === i ? { ...msg, dismissed: true } : msg))
+                      prev.map((msg, mIdx) => (mIdx === i ? { ...msg, tasksDismissed: true, dismissed: true } : msg))
                     );
                   }}
                 />
@@ -882,11 +1692,87 @@ export default function CopilotPanel({
           </div>
         )}
 
-        <form className="copilot-input" onSubmit={send}>
+        {/* Pending Attachments Strip */}
+        {pendingAttachments.length > 0 && (
+          <div className="px-4 py-2 border-t border-purple-100 dark:border-purple-900/40 bg-purple-50/50 dark:bg-slate-850 flex flex-wrap gap-2 max-h-36 overflow-y-auto">
+            {pendingAttachments.map((p) => {
+              const cat = getFileCategory(p.file.name, p.file.type);
+              return (
+                <div
+                  key={p.id}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs shadow-2xs ${
+                    p.error
+                      ? 'border-rose-300 bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:border-rose-900'
+                      : p.uploading
+                      ? 'border-purple-200 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 animate-pulse'
+                      : 'border-purple-200 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200'
+                  }`}
+                >
+                  {p.previewUrl ? (
+                    <img
+                      src={p.previewUrl}
+                      alt={p.file.name}
+                      className="w-6 h-6 rounded object-cover shrink-0"
+                    />
+                  ) : (
+                    <AttachmentIcon category={cat} size={15} />
+                  )}
+                  <div className="max-w-[140px] truncate min-w-0 font-medium text-[11.5px]" title={p.file.name}>
+                    {p.file.name}
+                  </div>
+                  <span className="text-[10px] text-slate-400">({formatFileSize(p.file.size)})</span>
+                  {p.uploading ? (
+                    <Loader2 size={13} className="animate-spin text-purple-600 shrink-0" />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(p.id)}
+                      className="text-slate-400 hover:text-rose-600 ml-1 p-0.5 rounded transition-colors shrink-0"
+                      title="ลบไฟล์แนบ"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <form className="copilot-input items-end" onSubmit={send}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.pdf,.xlsx,.xls,.docx,.doc,.pptx,.ppt,.msg,.eml,.txt,.json,.yaml,.yml,.csv,.log,.md,.ts,.js,.py,.sh,.sql"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                handleUploadFiles(e.target.files);
+                e.target.value = '';
+              }
+            }}
+          />
+
+          <button
+            type="button"
+            disabled={busy || enabled === false}
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2 rounded-lg text-slate-500 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-slate-800 transition-colors border border-slate-200 dark:border-slate-700 shrink-0 mb-[1px]"
+            title="แนบรูปภาพหรือเอกสาร (ภาพ, PDF, Excel, Word, PPT, Outlook MSG/EML, ข้อความ ฯลฯ)"
+          >
+            <Paperclip size={18} />
+          </button>
+
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask questions, request reports, or extract tasks…"
+            onPaste={handlePaste}
+            placeholder={
+              pendingAttachments.length > 0
+                ? 'พิมพ์คำสั่งพร้อมไฟล์แนบ (หรือกด Enter เพื่อส่งทันที)...'
+                : 'ถามคำถาม, แนบไฟล์/ลากวาง/วางรูปภาพหน้าจอ (Ctrl+V)...'
+            }
             rows={2}
             disabled={enabled === false}
             onKeyDown={(e) => {
@@ -896,7 +1782,12 @@ export default function CopilotPanel({
               }
             }}
           />
-          <button className="primary" type="submit" disabled={busy || enabled === false} aria-label="Send">
+          <button
+            className="primary"
+            type="submit"
+            disabled={busy || enabled === false || pendingAttachments.some((p) => p.uploading)}
+            aria-label="Send"
+          >
             <Send size={16} />
           </button>
         </form>

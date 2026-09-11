@@ -82,3 +82,29 @@ test('groupConversationsByDate groups conversations into today, yesterday, earli
   });
 });
 
+test('formatFileSize formats byte quantities into human readable units', async () => {
+  const { formatFileSize } = await import('./copilot-helpers.mjs');
+  assert.equal(formatFileSize(0), '0 B');
+  assert.equal(formatFileSize(500), '500 B');
+  assert.equal(formatFileSize(1024), '1.0 KB');
+  assert.equal(formatFileSize(15360), '15.0 KB');
+  assert.equal(formatFileSize(2097152), '2.0 MB');
+});
+
+test('getFileCategory detects file category by name and mimeType', async () => {
+  const { getFileCategory } = await import('./copilot-helpers.mjs');
+  assert.equal(getFileCategory('arch.png', 'image/png'), 'image');
+  assert.equal(getFileCategory('photo.JPEG'), 'image');
+  assert.equal(getFileCategory('doc.pdf', 'application/pdf'), 'pdf');
+  assert.equal(getFileCategory('budget.xlsx'), 'excel');
+  assert.equal(getFileCategory('data.csv'), 'excel');
+  assert.equal(getFileCategory('specs.docx'), 'word');
+  assert.equal(getFileCategory('slides.pptx'), 'powerpoint');
+  assert.equal(getFileCategory('email.msg'), 'outlook');
+  assert.equal(getFileCategory('email.eml'), 'outlook');
+  assert.equal(getFileCategory('server.log'), 'code');
+  assert.equal(getFileCategory('config.yaml'), 'code');
+  assert.equal(getFileCategory('script.py'), 'code');
+  assert.equal(getFileCategory('readme.txt'), 'text');
+});
+

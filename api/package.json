@@ -15,11 +15,13 @@
   },
   "dependencies": {
     "@google/genai": "^2.21.0",
+    "@kenjiuno/msgreader": "^1.28.0",
     "@prisma/client": "^6.16.0",
     "connect-pg-simple": "^10.0.0",
     "express": "^5.1.0",
     "express-session": "^1.18.2",
     "multer": "^2.0.2",
+    "officeparser": "^7.8.0",
     "pg": "^8.16.0"
   },
   "devDependencies": {

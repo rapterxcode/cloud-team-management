@@ -1,11 +1,61 @@
-export type Me = { id: string; email: string; name: string; title: string; role: 'admin' | 'member' | 'auditor'; workload: number };
+export type WorkspaceRole = 'admin' | 'lead' | 'member' | 'auditor' | 'viewer';
+
+export type Workspace = {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  color: string;
+  icon: string;
+  myRole?: WorkspaceRole;
+  createdAt?: string;
+  updatedAt?: string;
+  _count?: { projects: number; members: number };
+};
+
+export type AccessLogItem = {
+  id: string;
+  userId?: string | null;
+  email: string;
+  action: string;
+  ipAddress: string;
+  userAgent: string;
+  failureReason?: string | null;
+  createdAt: string;
+};
+
+export type AuditLogItem = {
+  id: string;
+  workspaceId?: string | null;
+  actorId: string;
+  actorName: string;
+  actorRole: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  details?: Record<string, any>;
+  createdAt: string;
+};
+
+export type Me = {
+  id: string;
+  email: string;
+  name: string;
+  title: string;
+  role: 'admin' | 'member' | 'auditor';
+  workload: number;
+  workspaces?: Workspace[];
+};
+
 export type User = { id: string; name: string; title: string; role: 'admin' | 'member' | 'auditor'; isActive: boolean; workload: number };
-export type Project = { id: string; name: string; description: string; status: string; progress: number; department: string; due: string; color: string; year: number; createdAt?: string };
+export type Project = { id: string; workspaceId?: string | null; name: string; description: string; status: string; progress: number; department: string; due: string; color: string; year: number; createdAt?: string };
 export type ApiTask = { id: string; projectId: string; name: string; description: string; ownerId: string; owner: { id: string; name: string }; phase: string; status: string; priority: string; start: string; date: string; sopArticleId?: string | null; changeDocumentId?: string | null; changeDocument?: { id: string; originalName: string; category: string; referenceNo: string } | null; sopArticle?: { id: string; name: string; category: string } | null };
 export type Task = ApiTask & { due: string; ownerName: string };
 export type Attachment = { id: string; originalName: string; sizeBytes: number };
 export type Article = {
   id: string;
+  workspaceId?: string | null;
+  isGlobal?: boolean;
   name: string;
   category: string;
   body: string;
@@ -34,8 +84,33 @@ export type TaskDraft = {
   description?: string;
 };
 
+export type ProjectDraft = {
+  name: string;
+  description?: string;
+  year?: number;
+  status?: string;
+  due?: string;
+};
+
+export type ArticleDraft = {
+  name?: string;
+  category?: string;
+  body: string;
+  format?: 'markdown' | 'html';
+  summary?: string;
+};
+
+export type CopilotAttachment = {
+  storedName: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 export type CopilotResponse = {
   answer: string;
+  draftProject?: ProjectDraft;
+  draftArticles?: ArticleDraft[];
   draftTask?: TaskDraft;
   draftTasks?: TaskDraft[];
   conversationId?: string;

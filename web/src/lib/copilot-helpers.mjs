@@ -87,3 +87,38 @@ export function groupConversationsByDate(conversations) {
   return { today, yesterday, earlier };
 }
 
+export function formatFileSize(bytes) {
+  if (!bytes || typeof bytes !== 'number' || bytes < 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function getFileCategory(fileName, mimeType = '') {
+  const name = String(fileName || '').toLowerCase();
+  const mime = String(mimeType || '').toLowerCase();
+
+  if (mime.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(name)) {
+    return 'image';
+  }
+  if (mime === 'application/pdf' || name.endsWith('.pdf')) {
+    return 'pdf';
+  }
+  if (/\.(xlsx?|ods|csv)$/i.test(name)) {
+    return 'excel';
+  }
+  if (/\.(docx?|odt|rtf)$/i.test(name)) {
+    return 'word';
+  }
+  if (/\.(pptx?|odp)$/i.test(name)) {
+    return 'powerpoint';
+  }
+  if (/\.(msg|eml)$/i.test(name)) {
+    return 'outlook';
+  }
+  if (/\.(json|ya?ml|log|sql|sh|bash|py|ts|js|jsx|tsx|html|xml|css)$/i.test(name)) {
+    return 'code';
+  }
+  return 'text';
+}
+

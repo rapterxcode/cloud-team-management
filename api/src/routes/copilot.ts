@@ -1,12 +1,63 @@
 import { Router } from 'express';
+import multer from 'multer';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, existsSync } from 'node:fs';
+import { extname, join, resolve, basename } from 'node:path';
 import type { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware.js';
+import { ATTACHMENTS_DIR } from './knowledge.js';
 import { buildSnapshot } from '../copilot/snapshot.js';
-import { CopilotNotConfiguredError, isConfigured, realAskLLM, type AskLLM, type ChatMessage, type TaskDraft } from '../copilot/gemini.js';
+import {
+  CopilotNotConfiguredError,
+  isConfigured,
+  realAskLLM,
+  type AskLLM,
+  type ChatMessage,
+  type TaskDraft,
+  type ProjectDraft,
+  type ArticleDraft,
+  type ChatAttachment,
+} from '../copilot/gemini.js';
+import { parseAttachmentFile } from '../copilot/document-parser.js';
+
+const ALLOWED_COPILOT_EXT = new Set([
+  // Images
+  '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg',
+  // Documents
+  '.pdf',
+  // Office
+  '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.odt', '.ods', '.odp', '.rtf',
+  // Outlook
+  '.msg', '.eml',
+  // Text, code, data
+  '.txt', '.csv', '.json', '.md', '.log', '.yaml', '.yml', '.sql', '.sh', '.ts', '.js', '.py', '.html', '.xml',
+]);
+const MAX_COPILOT_FILE_BYTES = 15 * 1024 * 1024; // 15 MB
+
+function makeCopilotUpload() {
+  mkdirSync(ATTACHMENTS_DIR(), { recursive: true });
+  return multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, ATTACHMENTS_DIR()),
+      filename: (_req, _file, cb) => cb(null, `copilot-${randomUUID()}`),
+    }),
+    limits: { fileSize: MAX_COPILOT_FILE_BYTES },
+    fileFilter: (_req, file, cb) => {
+      const ext = extname(file.originalname).toLowerCase();
+      if (!ALLOWED_COPILOT_EXT.has(ext)) {
+        return cb(Object.assign(new Error(`File type ${ext || 'unknown'} is not allowed for Copilot`), { status: 400 }));
+      }
+      cb(null, true);
+    },
+  });
+}
 
 const SYSTEM_PREFIX =
   'You are the Cloud Team Management Copilot, an agentic engineering assistant. Answer questions accurately grounded ONLY in the workspace data below. ' +
-  'If the user asks to create, assign, schedule, extract, or break down multiple tasks or runbook steps, call the draftTasks function tool with an array of tasks. ' +
+  'When the user asks to create, initialize, or scaffold a project along with tasks, runbooks, documentation, or knowledge articles, call the scaffoldWorkspace function tool (or draftProject, draftArticles, draftTasks) with complete details. ' +
+  'If the user asks to create or plan a new project, call draftProject with name, description, year, status, and due date. ' +
+  'If the user asks to create, assign, schedule, extract, or break down tasks or runbook steps, call the draftTasks function tool with an array of tasks. ' +
+  'If the user asks to write, draft, or extract documentation, knowledge articles, or runbooks, call draftArticles or draftArticle with the article content. ' +
   'If the user asks to create a single task, call draftTask or draftTasks with relevant details ' +
   '(such as task name, project name, assigned owner name, phase, priority, dates, and runbook/checklist description). ' +
   'When generating executive reports, status summaries, or analysis, format them cleanly using Markdown with headings, bullet points, and tables. ' +
@@ -59,7 +110,7 @@ async function resolveTaskDraft(
     if (u) ownerName = u.name;
   }
 
-  if (!projectId && defaultProject) {
+  if (!projectId && !projectName && defaultProject) {
     projectId = defaultProject.id;
     projectName = defaultProject.name;
   }
@@ -95,6 +146,37 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
 
   r.get('/status', (_req, res) => {
     res.json({ enabled: isConfigured() });
+  });
+
+  // --- File Upload & Attachments ---
+  const upload = makeCopilotUpload();
+  r.post('/upload', (req, res) => {
+    upload.single('file')(req, res, async (err: any) => {
+      if (err) {
+        const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : (err.status ?? 400);
+        return res.status(status).json({
+          error: err.code === 'LIMIT_FILE_SIZE' ? 'File is larger than 15 MB' : err.message,
+        });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: 'Choose a file to upload' });
+      }
+      res.status(201).json({
+        storedName: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        sizeBytes: req.file.size,
+      });
+    });
+  });
+
+  r.get('/attachments/:storedName', (req, res) => {
+    const raw = basename(req.params.storedName);
+    const target = resolve(join(ATTACHMENTS_DIR(), raw));
+    if (!target.startsWith(resolve(ATTACHMENTS_DIR())) || !existsSync(target)) {
+      return res.status(404).json({ error: 'Attachment not found' });
+    }
+    res.sendFile(target);
   });
 
   // --- Conversations Management ---
@@ -199,14 +281,81 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
 
     const conversationId = typeof req.body?.conversationId === 'string' ? req.body.conversationId.trim() : undefined;
 
+    const rawAttachments = Array.isArray(req.body?.attachments) ? req.body.attachments : [];
+    const validAttachments: { storedName: string; originalName: string; mimeType: string; sizeBytes: number }[] = [];
+    const chatAttachments: ChatAttachment[] = [];
+
+    for (const item of rawAttachments) {
+      if (item && typeof item.storedName === 'string' && typeof item.originalName === 'string') {
+        const storedName = basename(item.storedName);
+        const filePath = resolve(join(ATTACHMENTS_DIR(), storedName));
+        if (filePath.startsWith(resolve(ATTACHMENTS_DIR())) && existsSync(filePath)) {
+          validAttachments.push({
+            storedName,
+            originalName: String(item.originalName).slice(0, 200),
+            mimeType: String(item.mimeType || 'application/octet-stream'),
+            sizeBytes: Number(item.sizeBytes) || 0,
+          });
+          try {
+            const parsed = await parseAttachmentFile(filePath, item.originalName, item.mimeType);
+            chatAttachments.push(parsed);
+          } catch (e) {
+            chatAttachments.push({
+              type: 'text',
+              originalName: item.originalName,
+              content: `[Failed to parse attachment ${item.originalName}]`,
+            });
+          }
+        }
+      }
+    }
+
     try {
       const snapshot = await buildSnapshot(prisma);
+      const userMessage: ChatMessage = {
+        role: 'user',
+        content: question,
+        attachments: chatAttachments.length > 0 ? chatAttachments : undefined,
+      };
       const rawResult = await askLLM(
         SYSTEM_PREFIX + snapshot,
-        [...history, { role: 'user', content: question }],
-        { toolChoice: 'task' }
+        [...history, userMessage],
+        { toolChoice: 'all' }
       );
       const result = typeof rawResult === 'string' ? { answer: rawResult } : rawResult;
+
+      let draftProject: ProjectDraft | undefined = undefined;
+      if (result.draftProject && result.draftProject.name) {
+        const pName = String(result.draftProject.name).trim();
+        const validStatuses = ['New', 'On track', 'At risk', 'Completed'];
+        const status = validStatuses.includes(String(result.draftProject.status))
+          ? String(result.draftProject.status)
+          : 'New';
+        const year = Number(result.draftProject.year) || 2026;
+        draftProject = {
+          name: pName,
+          description: result.draftProject.description
+            ? String(result.draftProject.description).trim()
+            : 'Project initiated via AI Copilot.',
+          year: year >= 2000 && year <= 2100 ? year : 2026,
+          status,
+          due: result.draftProject.due ? String(result.draftProject.due).trim() : '',
+        };
+      }
+
+      const rawArticles = result.draftArticles || (result.draftArticle ? [result.draftArticle] : []);
+      const draftArticles: ArticleDraft[] = [];
+      for (const art of rawArticles) {
+        if (art && art.body) {
+          draftArticles.push({
+            name: String(art.name || 'Untitled Document').trim(),
+            category: String(art.category || 'Architecture').trim(),
+            format: art.format === 'html' ? 'html' : 'markdown',
+            body: String(art.body).trim(),
+            summary: art.summary ? String(art.summary).trim() : undefined,
+          });
+        }
+      }
 
       const defaultProject = await prisma.project.findFirst({ orderBy: { createdAt: 'asc' } });
       const defaultProjObj = defaultProject ? { id: defaultProject.id, name: defaultProject.name } : undefined;
@@ -221,7 +370,11 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
       const draftTasks: TaskDraft[] = [];
       for (const task of rawDraftTasks) {
         if (task && task.name) {
-          const resolved = await resolveTaskDraft(task, prisma, req.session.userId, defaultProjObj);
+          const taskCopy = { ...task };
+          if (!taskCopy.projectName && !taskCopy.projectId && draftProject) {
+            taskCopy.projectName = draftProject.name;
+          }
+          const resolved = await resolveTaskDraft(taskCopy, prisma, req.session.userId, defaultProjObj);
           draftTasks.push(resolved);
         }
       }
@@ -230,10 +383,16 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
 
       let activeConversationId = conversationId;
       if (req.session.userId) {
-        const userMsg = { role: 'user', content: question };
+        const userMsg = {
+          role: 'user',
+          content: question,
+          attachments: validAttachments.length > 0 ? validAttachments : undefined,
+        };
         const assistantMsg = {
           role: 'assistant',
           content: result.answer,
+          draftProject,
+          draftArticles: draftArticles.length > 0 ? draftArticles : undefined,
           draftTasks: draftTasks.length > 0 ? draftTasks : undefined,
           draftTask: singleDraftTask,
         };
@@ -270,6 +429,8 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
 
       res.json({
         answer: result.answer,
+        ...(draftProject ? { draftProject } : {}),
+        ...(draftArticles.length > 0 ? { draftArticles } : {}),
         ...(singleDraftTask ? { draftTask: singleDraftTask } : {}),
         ...(draftTasks.length > 0 ? { draftTasks } : {}),
         conversationId: activeConversationId,
