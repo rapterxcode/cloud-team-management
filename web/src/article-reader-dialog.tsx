@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Maximize2, Minimize2, Sparkles, BookOpen, Clock, FileText, User as UserIcon, Code2, Copy, Check } from 'lucide-react';
+import { Maximize2, Minimize2, Sparkles, BookOpen, Clock, FileText, User as UserIcon, Code2, Copy, Check, ExternalLink } from 'lucide-react';
 import type { Article, Me } from '@/lib/types';
 import MarkdownViewer from './markdown-viewer';
 import ArticleAttachments from './attachments';
@@ -72,13 +72,21 @@ export default function ArticleReaderDialog({
   };
 
   const copyMarkdown = async () => {
+    if (!article) return;
     try {
       await navigator.clipboard.writeText(article.body);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2000);
     } catch {
-      // ignore
+      // ignore clipboard error
     }
+  };
+
+  const openInNewTab = () => {
+    if (!article?.body) return;
+    const blob = new Blob([article.body], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -110,6 +118,18 @@ export default function ArticleReaderDialog({
                   {copiedLink ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                   <span>{copiedLink ? 'Copied' : 'Copy'}</span>
                 </button>
+                {isHtml && (
+                  <button
+                    type="button"
+                    className="article-tool-btn"
+                    onClick={openInNewTab}
+                    title="Open interactive page in new tab"
+                    aria-label="Open in new tab"
+                  >
+                    <ExternalLink size={14} />
+                    <span>Open in new tab</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   className="article-tool-btn"
@@ -146,7 +166,7 @@ export default function ArticleReaderDialog({
                     <span>Sandboxed Interactive Page — JavaScript execution isolated for ISO 27001 safety.</span>
                   </div>
                   <iframe
-                    sandbox="allow-scripts allow-downloads"
+                    sandbox="allow-scripts allow-downloads allow-forms allow-popups allow-modals"
                     srcDoc={article.body}
                     title={article.name}
                     className="article-html-frame w-full h-[620px] rounded-lg border border-border bg-white"

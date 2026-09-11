@@ -1,6 +1,6 @@
 import React from 'react';
-import { Bold, Italic, Code, List, ListOrdered, CheckSquare, Heading1, Heading2, Heading3, Table, AlertCircle, Quote, Upload, FileCode2 } from 'lucide-react';
-import { parseImportedFile } from './lib/toc.mjs';
+import { Bold, Italic, Code, List, ListOrdered, CheckSquare, Heading1, Heading2, Heading3, Table, AlertCircle, Quote, Upload, FileCode2, Palette, Sparkles } from 'lucide-react';
+import { parseImportedFile, CDN_CSS_PRESETS, getHtmlTemplateWithCdn } from './lib/toc.mjs';
 
 type EditorToolbarProps = {
   format: 'markdown' | 'html';
@@ -195,32 +195,77 @@ export default function EditorToolbar({
           </button>
         </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-semibold text-muted-foreground mr-1 flex items-center gap-1">
+            <Palette size={13} className="text-purple-600 dark:text-purple-400" />
+            <span>CDN CSS:</span>
+          </span>
+          {CDN_CSS_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              className="tool-btn text-xs px-2 py-0.5 font-medium bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200/80 dark:border-purple-800/60 rounded transition-colors"
+              onClick={() => onInsert(preset.snippet, '', '')}
+              title={`Insert ${preset.name}: ${preset.description}`}
+            >
+              + {preset.badge || preset.name}
+            </button>
+          ))}
+
+          <span className="toolbar-divider" />
+
+          <span className="text-xs font-semibold text-muted-foreground mr-1 flex items-center gap-1">
+            <Sparkles size={13} className="text-amber-500" />
+            <span>Templates:</span>
+          </span>
           <button
             type="button"
-            className="tool-btn text-xs px-2"
-            onClick={() => onInsert('<!DOCTYPE html>\n<html>\n<head>\n  <style>\n    body { font-family: sans-serif; padding: 20px; }\n  </style>\n</head>\n<body>\n  ', '\n</body>\n</html>', '<h1>Interactive Tool</h1>')}
+            className="tool-btn text-xs px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded font-medium transition-colors"
+            onClick={() => onInsert(getHtmlTemplateWithCdn('tailwind'), '', '')}
+            title="Insert Tailwind CSS Starter Template"
           >
-            HTML Skeleton
+            Tailwind Starter
           </button>
           <button
             type="button"
+            className="tool-btn text-xs px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded font-medium transition-colors"
+            onClick={() => onInsert(getHtmlTemplateWithCdn('bootstrap'), '', '')}
+            title="Insert Bootstrap 5 Starter Template"
+          >
+            Bootstrap Starter
+          </button>
+          <button
+            type="button"
+            className="tool-btn text-xs px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 rounded font-medium transition-colors"
+            onClick={() => onInsert(getHtmlTemplateWithCdn('pico'), '', '')}
+            title="Insert Pico.css Semantic Starter Template"
+          >
+            Pico Starter
+          </button>
+
+          <span className="toolbar-divider" />
+
+          <button
+            type="button"
             className="tool-btn text-xs px-2"
-            onClick={() => onInsert('<style>\n  ', '\n</style>', 'button { background: #8b5cf6; color: white; padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; }')}
+            onClick={() => onInsert('<style>\n  ', '\n</style>', '/* Custom CSS */')}
+            title="Insert <style> block"
           >
             &lt;style&gt;
           </button>
           <button
             type="button"
             className="tool-btn text-xs px-2"
-            onClick={() => onInsert('<script>\n  ', '\n</script>', 'function executeCheck() { alert("Verification passed!"); }')}
+            onClick={() => onInsert('<script>\n  ', '\n</script>', '// JavaScript code')}
+            title="Insert <script> block"
           >
             &lt;script&gt;
           </button>
           <button
             type="button"
             className="tool-btn text-xs px-2"
-            onClick={() => onInsert('<button onclick="', '">Run Action</button>', 'alert("Action executed!")')}
+            onClick={() => onInsert('<button onclick="', '">Click Me</button>', 'alert("Executed!")')}
+            title="Insert interactive <button>"
           >
             &lt;button&gt;
           </button>

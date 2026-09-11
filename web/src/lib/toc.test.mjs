@@ -87,3 +87,38 @@ test('parseImportedFile extracts title, format, and content for markdown and htm
   assert.equal(txtParsed.name, 'incident-notes');
   assert.equal(txtParsed.format, 'markdown');
 });
+
+test('CDN_CSS_PRESETS provides verified CDN URLs for popular frameworks', async () => {
+  const { CDN_CSS_PRESETS } = await import('./toc.mjs');
+  assert.ok(Array.isArray(CDN_CSS_PRESETS));
+  assert.ok(CDN_CSS_PRESETS.length >= 4);
+
+  const tailwind = CDN_CSS_PRESETS.find(p => p.id === 'tailwind');
+  assert.ok(tailwind);
+  assert.match(tailwind.snippet, /cdn\.tailwindcss\.com/);
+
+  const bootstrap = CDN_CSS_PRESETS.find(p => p.id === 'bootstrap');
+  assert.ok(bootstrap);
+  assert.match(bootstrap.snippet, /cdn\.jsdelivr\.net\/npm\/bootstrap/);
+
+  const fontAwesome = CDN_CSS_PRESETS.find(p => p.id === 'fontawesome');
+  assert.ok(fontAwesome);
+  assert.match(fontAwesome.snippet, /cdnjs\.cloudflare\.com\/ajax\/libs\/font-awesome/);
+});
+
+test('getHtmlTemplateWithCdn returns valid HTML skeletons with CDN resources', async () => {
+  const { getHtmlTemplateWithCdn } = await import('./toc.mjs');
+
+  const twHtml = getHtmlTemplateWithCdn('tailwind');
+  assert.match(twHtml, /<!DOCTYPE html>/i);
+  assert.match(twHtml, /cdn\.tailwindcss\.com/);
+  assert.match(twHtml, /class="[^"]*bg-[^"]*"/);
+
+  const bsHtml = getHtmlTemplateWithCdn('bootstrap');
+  assert.match(bsHtml, /<!DOCTYPE html>/i);
+  assert.match(bsHtml, /bootstrap(\.min)?\.css/);
+  assert.match(bsHtml, /class="[^"]*btn-primary[^"]*"/);
+
+  const picoHtml = getHtmlTemplateWithCdn('pico');
+  assert.match(picoHtml, /pico(\.min)?\.css/);
+});
