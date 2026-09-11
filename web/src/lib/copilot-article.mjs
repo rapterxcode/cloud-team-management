@@ -48,6 +48,7 @@ export const COPILOT_ARTICLE_PRESETS = [
  * @param {string} [context.name] - Article name/title
  * @param {string} [context.category] - Article category
  * @param {string} [context.format] - 'markdown' | 'html'
+ * @param {string} [context.currentBody] - Current body content
  * @param {string} [context.customPrompt] - User's free-form prompt
  * @returns {string} Prompt string
  */
