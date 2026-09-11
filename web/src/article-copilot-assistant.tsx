@@ -286,44 +286,41 @@ export function ArticleCopilotAssistant({
   return (
     <div
       id="article-copilot-assistant"
-      className={`mb-4 rounded-2xl border-2 border-purple-300/90 bg-gradient-to-b from-purple-50/70 via-white to-white shadow-sm overflow-hidden transition-all ${
-        isFullWorkspace ? 'h-full flex-1 flex flex-col min-h-[620px]' : ''
+      className={`rounded-2xl border-2 border-purple-300/90 bg-gradient-to-b from-purple-50/70 via-white to-white shadow-sm overflow-hidden transition-all ${
+        isFullWorkspace ? 'h-full flex-1 flex flex-col min-h-0 mb-0' : 'mb-4'
       } ${className}`}
     >
       {/* Header Bar */}
-      <div className="flex items-center justify-between px-5 py-3.5 bg-purple-50/90 border-b border-purple-100 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-purple-600 text-white shadow-xs">
-            <Sparkles size={18} />
+      <div className="flex items-center justify-between px-4 py-3 bg-purple-50/90 border-b border-purple-100 flex-shrink-0">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-600 text-white shadow-xs">
+            <Sparkles size={16} />
           </span>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-base md:text-lg font-bold text-purple-950">AI Copilot Assistant</span>
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200/80">
-                {isFullWorkspace ? 'Full Chat Workspace' : 'Smart Editor Chat'}
-              </span>
+              <span className="text-sm md:text-base font-bold text-purple-950">AI Copilot Workspace</span>
               {messages.length > 0 && (
-                <span className="text-xs font-semibold bg-purple-200/90 text-purple-900 px-2.5 py-0.5 rounded-full">
-                  {messages.length} ข้อความ
+                <span className="text-xs font-semibold bg-purple-200/90 text-purple-900 px-2 py-0.5 rounded-full">
+                  {messages.length}
                 </span>
               )}
             </div>
-            <p className="text-xs text-purple-700 mt-0.5 hidden sm:block">
-              สนทนาโต้ตอบ ร่างเนื้อหาใหม่ หรือขอให้แก้ไขบทความได้ทันที
+            <p className="text-[11px] text-purple-700 hidden sm:block">
+              สนทนา ร่าง และแก้ไขบทความไปพร้อมกับ Editor
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {onToggleFullWorkspace && (
             <button
               type="button"
               onClick={() => onToggleFullWorkspace(!isFullWorkspace)}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-800 hover:text-purple-950 bg-purple-100/70 hover:bg-purple-200/80 px-3 py-1.5 rounded-lg transition-colors border border-purple-200"
-              title={isFullWorkspace ? 'ย่อกลับเป็นโหมดปกติ' : 'ขยายเต็มพื้นที่หน้าจอ (Full Workspace)'}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-purple-800 hover:text-purple-950 bg-purple-100/70 hover:bg-purple-200/80 px-2.5 py-1.5 rounded-lg transition-colors border border-purple-200"
+              title={isFullWorkspace ? 'สลับเป็นโหมดเคียงข้าง Editor' : 'ขยายเต็มพื้นที่หน้าจอ (Full Workspace)'}
             >
-              {isFullWorkspace ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-              <span className="hidden sm:inline">{isFullWorkspace ? 'ย่อกลับ' : 'ขยายเต็มพื้นที่'}</span>
+              {isFullWorkspace ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+              <span className="hidden sm:inline">{isFullWorkspace ? 'ย่อกลับ' : 'เต็มจอ'}</span>
             </button>
           )}
 
@@ -331,11 +328,11 @@ export function ArticleCopilotAssistant({
             <button
               type="button"
               onClick={handleClearChat}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors"
               title="ล้างประวัติการสนทนา"
             >
-              <Trash2 size={14} />
-              <span>ล้างแชท</span>
+              <Trash2 size={13} />
+              <span className="hidden sm:inline">ล้างแชท</span>
             </button>
           )}
 
@@ -343,43 +340,43 @@ export function ArticleCopilotAssistant({
             <button
               type="button"
               onClick={onRevert}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 px-3.5 py-1.5 rounded-lg border border-amber-200 transition-colors"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg border border-amber-200 transition-colors"
               title="ยกเลิกการแก้ไขล่าสุดของ AI"
             >
-              <RotateCcw size={14} />
-              ย้อนกลับ (Revert)
+              <RotateCcw size={13} />
+              <span className="hidden sm:inline">ย้อนกลับ</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={() => toggleOpen(false)}
-            className="text-purple-700 hover:text-purple-950 p-2 rounded-lg hover:bg-purple-100/80 transition-colors"
-            aria-label="ย่อขนาด AI Chat"
-            title="ย่อขนาด AI Chat"
+            className="text-purple-700 hover:text-purple-950 p-1.5 rounded-lg hover:bg-purple-100/80 transition-colors"
+            aria-label="ซ่อนแผง AI Chat"
+            title="ซ่อนแผง AI Chat เพื่อโฟกัสที่ Editor เต็มจอ"
           >
-            <ChevronUp size={20} />
+            <ChevronUp size={18} />
           </button>
         </div>
       </div>
 
-      <div className={`p-5 md:p-6 space-y-5 ${isFullWorkspace ? 'flex-1 flex flex-col min-h-0 overflow-y-auto' : ''}`}>
+      <div className={`p-4 md:p-5 space-y-3.5 ${isFullWorkspace ? 'flex-1 flex flex-col min-h-0 overflow-hidden' : ''}`}>
         {/* Quick Preset Action Chips */}
         <div className="flex-shrink-0">
-          <div className="text-xs md:text-sm font-bold text-slate-800 mb-2 flex items-center justify-between">
+          <div className="text-xs font-bold text-slate-800 mb-1.5 flex items-center justify-between">
             <span>คำสั่งด่วน 1 คลิก (Quick Actions):</span>
-            <span className="text-xs font-normal text-purple-700">
-              คลิกคำสั่งด่วนด้านล่าง หรือพิมพ์คำสั่งอิสระในช่องแชท
+            <span className="text-[11px] font-normal text-purple-700 hidden sm:inline">
+              คลิกคำสั่งด่วน หรือพิมพ์ในช่องแชท
             </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {COPILOT_ARTICLE_PRESETS.map((preset) => (
               <button
                 key={preset.id}
                 type="button"
                 disabled={loading}
                 onClick={() => handlePresetClick(preset.id)}
-                className="inline-flex items-center gap-1.5 text-xs md:text-sm font-medium px-3.5 py-2 rounded-xl border border-purple-200/90 bg-white hover:bg-purple-50 text-purple-950 hover:border-purple-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
+                className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-purple-200/90 bg-white hover:bg-purple-50 text-purple-950 hover:border-purple-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
                 title={preset.description}
               >
                 {preset.label}
@@ -388,10 +385,10 @@ export function ArticleCopilotAssistant({
           </div>
         </div>
 
-        {/* Conversation Thread / Viewport Canvas (Greatly Expanded Height) */}
+        {/* Conversation Thread / Viewport Canvas */}
         <div
-          className={`space-y-4 overflow-y-auto pr-1.5 p-5 md:p-6 rounded-2xl bg-slate-50/95 border border-purple-100 text-sm md:text-base shadow-inner ${
-            isFullWorkspace ? 'flex-1 min-h-[380px] max-h-[620px]' : 'min-h-[260px] md:min-h-[340px] max-h-[620px]'
+          className={`space-y-3.5 overflow-y-auto pr-1.5 p-4 rounded-2xl bg-slate-50/95 border border-purple-100 text-sm shadow-inner ${
+            isFullWorkspace ? 'flex-1 min-h-0' : 'min-h-[260px] md:min-h-[340px] max-h-[620px]'
           }`}
         >
           {messages.length === 0 ? (
@@ -557,7 +554,7 @@ export function ArticleCopilotAssistant({
           <div ref={chatEndRef} />
         </div>
 
-        {/* Persistent AI Chat Input Box (Spacious, Extra-Tall & Resizable) */}
+        {/* Persistent AI Chat Input Box (Spacious & Resizable) */}
         <div className="pt-1 flex-shrink-0">
           <div className="relative border-2 border-purple-300/90 rounded-2xl bg-white shadow-xs focus-within:border-purple-600 focus-within:ring-2 focus-within:ring-purple-200 transition-all">
             <textarea
@@ -571,41 +568,39 @@ export function ArticleCopilotAssistant({
                   handleSendMessage();
                 }
               }}
-              rows={isFullWorkspace ? 6 : 7}
-              placeholder="พิมพ์คำสั่งหรือถามคำถามกับ AI Copilot ที่นี่... (เช่น 'ร่างบทความเรื่อง GKE Cluster Hardening ให้ละเอียด มี Code config และ Verification checklist', 'จัดตารางและ Code block ให้เรียบร้อย', 'แปลงเป็นหน้า HTML ด้วย Tailwind สวยงาม') [Enter เพื่อส่ง, Shift+Enter เพื่อขึ้นบรรทัดใหม่]"
+              rows={isFullWorkspace ? 4 : 5}
+              placeholder="พิมพ์คำสั่งหรือถามคำถามกับ AI Copilot ที่นี่... (เช่น 'ร่างบทความเรื่อง GKE Cluster Hardening ให้ละเอียด', 'จัดตารางและ Code block', 'แปลงเป็น HTML สวยงาม') [Enter ส่ง, Shift+Enter ขึ้นบรรทัดใหม่]"
               disabled={loading}
-              className="w-full text-base leading-relaxed p-4 md:p-5 rounded-t-2xl bg-transparent placeholder:text-slate-400 focus:outline-none resize-y min-h-[180px] md:min-h-[220px] max-h-[480px]"
+              className="w-full text-sm md:text-base leading-relaxed p-3.5 md:p-4 rounded-t-2xl bg-transparent placeholder:text-slate-400 focus:outline-none resize-y min-h-[100px] md:min-h-[120px] max-h-[320px]"
             />
-            <div className="flex items-center justify-between px-4 py-3 bg-slate-50/90 rounded-b-2xl border-t border-slate-100 flex-wrap gap-2">
-              <div className="text-xs md:text-sm text-slate-500 hidden sm:flex items-center gap-2">
-                <kbd className="px-2 py-0.5 rounded bg-white border border-slate-200 text-xs font-mono shadow-2xs font-semibold">
+            <div className="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/90 rounded-b-2xl border-t border-slate-100 flex-wrap gap-2">
+              <div className="text-xs text-slate-500 hidden sm:flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[11px] font-mono shadow-2xs font-semibold">
                   Enter
                 </kbd>{' '}
-                ส่งคำสั่ง
+                ส่ง
                 <span className="text-slate-300">•</span>
-                <kbd className="px-2 py-0.5 rounded bg-white border border-slate-200 text-xs font-mono shadow-2xs font-semibold">
+                <kbd className="px-1.5 py-0.5 rounded bg-white border border-slate-200 text-[11px] font-mono shadow-2xs font-semibold">
                   Shift+Enter
                 </kbd>{' '}
                 ขึ้นบรรทัดใหม่
-                <span className="text-slate-300">•</span>
-                <span className="text-xs text-purple-700 font-medium">ลากมุมขวาล่างเพื่อปรับขยายความสูงได้</span>
               </div>
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"
                   onClick={() => handleSendMessage()}
                   disabled={loading || !prompt.trim()}
-                  className="inline-flex items-center gap-2 text-sm md:text-base font-bold px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 text-xs md:text-sm font-bold px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   title="ส่งคำสั่งให้ Copilot"
                 >
                   {loading ? (
                     <>
-                      <Loader2 size={17} className="animate-spin" />
+                      <Loader2 size={15} className="animate-spin" />
                       กำลังสร้างเนื้อหา...
                     </>
                   ) : (
                     <>
-                      <Send size={17} />
+                      <Send size={15} />
                       ส่งคำสั่ง (Send)
                     </>
                   )}

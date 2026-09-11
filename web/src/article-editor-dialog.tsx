@@ -223,29 +223,6 @@ export default function ArticleEditorDialog({
 
               {/* View mode toggle, AI Chat toggle & Fullscreen toggle */}
               <div className="flex items-center gap-2">
-                {currentUser?.role !== 'auditor' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (viewMode !== 'ai-chat') {
-                        setViewMode('ai-chat');
-                      } else {
-                        setViewMode('split');
-                      }
-                      setCopilotOpen(true);
-                    }}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      viewMode === 'ai-chat'
-                        ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
-                        : 'bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
-                    }`}
-                    title={viewMode === 'ai-chat' ? 'สลับกลับไปยัง Editor View' : 'เปิดโหมด AI Chat Workspace (เต็มพื้นที่หน้าจอ)'}
-                  >
-                    <Sparkles size={13} className={viewMode === 'ai-chat' ? 'text-white' : 'text-purple-600'} />
-                    <span>{viewMode === 'ai-chat' ? 'Editor View' : 'AI Chat (เต็มจอ)'}</span>
-                  </button>
-                )}
-
                 <div className="flex items-center bg-muted/70 p-0.5 rounded-lg border border-border text-xs">
                   <button
                     type="button"
@@ -263,31 +240,16 @@ export default function ArticleEditorDialog({
                   <button
                     type="button"
                     onClick={() => setViewMode('split')}
-                    className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors ${
                       viewMode === 'split'
                         ? 'bg-background text-foreground font-semibold shadow-2xs'
                         : 'text-muted-foreground hover:text-foreground'
                     }`}
-                    title="Side-by-Side Split View"
+                    title="Editor & Live Preview Split"
                   >
                     <Columns size={13} />
                     <span>Split View</span>
                   </button>
-                  {currentUser?.role !== 'auditor' && (
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('ai-chat')}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-colors ${
-                        viewMode === 'ai-chat'
-                          ? 'bg-purple-600 text-white font-bold shadow-xs'
-                          : 'text-purple-700 hover:text-purple-900 hover:bg-purple-50 dark:text-purple-300'
-                      }`}
-                      title="Full-Height AI Chat Workspace"
-                    >
-                      <Sparkles size={13} className={viewMode === 'ai-chat' ? 'text-white' : 'text-purple-600'} />
-                      <span>AI Chat Workspace</span>
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={() => setViewMode('preview')}
@@ -303,6 +265,31 @@ export default function ArticleEditorDialog({
                   </button>
                 </div>
 
+                {currentUser?.role !== 'auditor' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (viewMode === 'ai-chat') {
+                        setViewMode('split');
+                        setCopilotOpen(true);
+                      } else {
+                        setCopilotOpen(!copilotOpen);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      copilotOpen && viewMode !== 'ai-chat'
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                        : viewMode === 'ai-chat'
+                        ? 'bg-purple-800 text-white border-purple-800 shadow-2xs'
+                        : 'bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
+                    }`}
+                    title={copilotOpen ? 'ซ่อนแผง AI Chat Workspace' : 'เปิดแผง AI Chat Workspace รวมเคียงข้าง Editor'}
+                  >
+                    <Sparkles size={13} className={copilotOpen || viewMode === 'ai-chat' ? 'text-white' : 'text-purple-600'} />
+                    <span>{copilotOpen && viewMode !== 'ai-chat' ? 'AI Chat (เปิดอยู่)' : viewMode === 'ai-chat' ? 'AI Chat (เต็มจอ)' : 'เปิด AI Chat'}</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setMaximized(!maximized)}
@@ -316,11 +303,11 @@ export default function ArticleEditorDialog({
             </div>
           </DialogHeader>
 
-          {/* Main Scrollable Canvas */}
+          {/* Main Workspace Canvas */}
           <div className="article-editor-content">
             {/* Error Banner */}
             {error && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-center justify-between">
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-center justify-between flex-shrink-0">
                 <span>{error}</span>
                 <button type="button" onClick={() => setError(null)} className="text-rose-500 hover:text-rose-800">
                   ✕
@@ -329,7 +316,7 @@ export default function ArticleEditorDialog({
             )}
 
             {/* Top Metadata Row: Title, Category, Project */}
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center flex-shrink-0">
               <div className="md:col-span-6">
                 <input
                   type="text"
@@ -370,9 +357,9 @@ export default function ArticleEditorDialog({
               </div>
             </div>
 
-            {/* When in AI Chat Workspace Mode: Dedicated Full-Height View */}
-            {viewMode === 'ai-chat' && (
-              <div className="flex-1 flex flex-col min-h-[620px] mt-2">
+            {/* When in AI Chat Fullscreen Mode: Dedicated Full-Height View */}
+            {viewMode === 'ai-chat' ? (
+              <div className="flex-1 flex flex-col min-h-0 h-full">
                 <ArticleCopilotAssistant
                   currentTitle={name}
                   currentCategory={category}
@@ -406,141 +393,157 @@ export default function ArticleEditorDialog({
                   }}
                 />
               </div>
-            )}
-
-            {/* In-Editor AI Copilot Assistant & Toolbar (When in regular editor modes) */}
-            {viewMode !== 'ai-chat' && (
-              <>
-                <ArticleCopilotAssistant
-                  currentTitle={name}
-                  currentCategory={category}
-                  currentFormat={format}
-                  currentBody={body}
-                  currentUser={currentUser}
-                  isOpen={copilotOpen}
-                  onToggleOpen={setCopilotOpen}
-                  isFullWorkspace={false}
-                  onToggleFullWorkspace={() => setViewMode('ai-chat')}
-                  canRevert={!!previousState}
-                  onRevert={() => {
-                    if (previousState) {
-                      setName(previousState.name);
-                      setBody(previousState.body);
-                      setFormat(previousState.format);
-                      setPreviousState(null);
-                    }
-                  }}
-                  onApply={(draft, mode = 'replace') => {
-                    setPreviousState({ name, body, format });
-                    // Only adopt draft title if user hasn't set their own custom title yet
-                    if (draft.name && draft.name !== 'Draft Article' && !name.trim()) {
-                      setName(draft.name);
-                    }
-                    if (mode === 'append') {
-                      setBody((prev) => (prev ? prev.trimEnd() + '\n\n' + draft.body : draft.body));
-                    } else {
-                      setBody(draft.body);
-                    }
-                    if (draft.format) setFormat(draft.format);
-                    if (viewMode === 'preview') setViewMode('split');
-                  }}
-                />
-
-                {/* Formatting Toolbar */}
-                <EditorToolbar
-                  format={format}
-                  onFormatChange={setFormat}
-                  onInsert={handleInsert}
-                  onImportDoc={handleImportDoc}
-                />
-              </>
-            )}
-
-            {/* Editor & Preview Workspace */}
-            {viewMode === 'split' && (
-              <div className="editor-workspace-split">
-                {/* Left: Textarea Editor */}
-                <div className="flex flex-col h-full min-h-[460px]">
-                  <textarea
-                    ref={textareaRef}
-                    onKeyDown={handleEditorKeyDown}
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    required
-                    maxLength={100000}
-                    placeholder={
-                      format === 'html'
-                        ? 'Write interactive HTML/CSS/JS with CDN CSS (Tailwind, Bootstrap, Pico, etc.)...'
-                        : 'Write technical documentation, procedures, or notes with Markdown (# header, ``` code, - list)...'
-                    }
-                    className="w-full h-full min-h-[460px] font-mono text-xs md:text-sm p-4 rounded-lg border border-border bg-background leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-purple-500 shadow-2xs"
+            ) : (
+              /* COMBINED WORKSPACE: Editor Workspace (Left) & Full AI Chat Workspace (Right) Side-by-Side */
+              <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3.5 h-full">
+                {/* LEFT COLUMN: Editor Workspace (Toolbar + Editor / Preview) */}
+                <div
+                  className={`flex flex-col min-h-0 h-full min-w-0 transition-all ${
+                    copilotOpen && currentUser?.role !== 'auditor'
+                      ? viewMode === 'split'
+                        ? 'flex-1 lg:w-[58%] xl:w-[60%]'
+                        : 'flex-1 lg:w-[54%] xl:w-[56%]'
+                      : 'w-full flex-1'
+                  }`}
+                >
+                  <EditorToolbar
+                    format={format}
+                    onFormatChange={setFormat}
+                    onInsert={handleInsert}
+                    onImportDoc={handleImportDoc}
                   />
-                </div>
 
-                {/* Right: Live Preview */}
-                <div className="flex flex-col h-full min-h-[460px] border border-border rounded-lg bg-background p-4 md:p-6 overflow-y-auto shadow-2xs">
-                  <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 pb-1 border-b border-border/60">
-                    Live Preview ({format === 'html' ? 'Interactive HTML' : 'Markdown'})
-                  </div>
-                  {body ? (
-                    format === 'html' ? (
-                      <iframe
-                        sandbox="allow-scripts allow-downloads allow-forms allow-popups allow-modals"
-                        srcDoc={body}
-                        className="w-full h-full min-h-[420px] rounded border border-border bg-white"
-                        title="HTML Live Preview"
+                  {/* Editor & Preview Bodies */}
+                  <div className="flex-1 min-h-0 flex flex-col h-full">
+                    {viewMode === 'write' && (
+                      <textarea
+                        ref={textareaRef}
+                        onKeyDown={handleEditorKeyDown}
+                        value={body}
+                        onChange={(e) => setBody(e.target.value)}
+                        required
+                        maxLength={100000}
+                        placeholder={
+                          format === 'html'
+                            ? 'Write interactive HTML/CSS/JS with CDN CSS (Tailwind, Bootstrap, Pico, etc.)...'
+                            : 'Write technical documentation, procedures, or notes with Markdown (# header, ``` code, - list)...'
+                        }
+                        className="w-full h-full min-h-[440px] flex-1 font-mono text-xs md:text-sm p-4 rounded-lg border border-border bg-background leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-purple-500 shadow-2xs"
                       />
-                    ) : (
-                      <div className="markdown-content">
-                        <MarkdownViewer content={body} />
+                    )}
+
+                    {viewMode === 'split' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 h-full flex-1 min-h-0">
+                        <div className="flex flex-col h-full min-h-[440px]">
+                          <textarea
+                            ref={textareaRef}
+                            onKeyDown={handleEditorKeyDown}
+                            value={body}
+                            onChange={(e) => setBody(e.target.value)}
+                            required
+                            maxLength={100000}
+                            placeholder={
+                              format === 'html'
+                                ? 'Write interactive HTML/CSS/JS with CDN CSS (Tailwind, Bootstrap, Pico, etc.)...'
+                                : 'Write technical documentation, procedures, or notes with Markdown (# header, ``` code, - list)...'
+                            }
+                            className="w-full h-full min-h-[440px] flex-1 font-mono text-xs md:text-sm p-4 rounded-lg border border-border bg-background leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-purple-500 shadow-2xs"
+                          />
+                        </div>
+
+                        <div className="flex flex-col h-full min-h-[440px] border border-border rounded-lg bg-background p-4 overflow-y-auto shadow-2xs">
+                          <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 pb-1 border-b border-border/60">
+                            Live Preview ({format === 'html' ? 'HTML' : 'Markdown'})
+                          </div>
+                          {body ? (
+                            format === 'html' ? (
+                              <iframe
+                                sandbox="allow-scripts allow-downloads allow-forms allow-popups allow-modals"
+                                srcDoc={body}
+                                className="w-full h-full min-h-[380px] flex-1 rounded border border-border bg-white"
+                                title="HTML Live Preview"
+                              />
+                            ) : (
+                              <div className="markdown-content">
+                                <MarkdownViewer content={body} />
+                              </div>
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center h-full min-h-[200px] text-muted-foreground text-xs">
+                              <Eye size={24} className="opacity-30 mb-2" />
+                              <p>Start typing or use AI Copilot to see the live preview here.</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full min-h-[300px] text-muted-foreground text-xs">
-                      <Eye size={24} className="opacity-30 mb-2" />
-                      <p>Start typing or use AI Copilot to see the live preview here.</p>
-                    </div>
-                  )}
+                    )}
+
+                    {viewMode === 'preview' && (
+                      <div className="flex flex-col h-full min-h-[440px] flex-1 border border-border rounded-lg bg-background p-6 overflow-y-auto shadow-2xs">
+                        {body ? (
+                          format === 'html' ? (
+                            <iframe
+                              sandbox="allow-scripts allow-downloads allow-forms allow-popups allow-modals"
+                              srcDoc={body}
+                              className="w-full h-full min-h-[420px] flex-1 rounded border border-border bg-white"
+                              title="HTML Preview"
+                            />
+                          ) : (
+                            <div className="markdown-content">
+                              <MarkdownViewer content={body} />
+                            </div>
+                          )
+                        ) : (
+                          <p className="empty">Nothing to preview yet. Write some content first.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
 
-            {viewMode === 'write' && (
-              <div className="flex flex-col flex-1 min-h-[500px]">
-                <textarea
-                  ref={textareaRef}
-                  onKeyDown={handleEditorKeyDown}
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  required
-                  maxLength={100000}
-                  placeholder={
-                    format === 'html'
-                      ? 'Write interactive HTML/CSS/JS with CDN CSS (Tailwind, Bootstrap, Pico, etc.)...'
-                      : 'Write technical documentation, procedures, or notes with Markdown (# header, ``` code, - list)...'
-                  }
-                  className="w-full flex-1 min-h-[500px] font-mono text-xs md:text-sm p-4 rounded-lg border border-border bg-background leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-purple-500 shadow-2xs"
-                />
-              </div>
-            )}
-
-            {viewMode === 'preview' && (
-              <div className="flex flex-col flex-1 min-h-[500px] border border-border rounded-lg bg-background p-6 overflow-y-auto shadow-2xs">
-                {body ? (
-                  format === 'html' ? (
-                    <iframe
-                      sandbox="allow-scripts allow-downloads allow-forms allow-popups allow-modals"
-                      srcDoc={body}
-                      className="w-full min-h-[500px] rounded border border-border bg-white"
-                      title="HTML Preview"
+                {/* RIGHT COLUMN: Full AI Chat Workspace */}
+                {currentUser?.role !== 'auditor' && copilotOpen && (
+                  <div
+                    className={`flex-shrink-0 flex flex-col min-h-0 h-full transition-all ${
+                      viewMode === 'split'
+                        ? 'w-full lg:w-[42%] xl:w-[40%]'
+                        : 'w-full lg:w-[46%] xl:w-[44%]'
+                    }`}
+                  >
+                    <ArticleCopilotAssistant
+                      currentTitle={name}
+                      currentCategory={category}
+                      currentFormat={format}
+                      currentBody={body}
+                      currentUser={currentUser}
+                      isOpen={true}
+                      onToggleOpen={setCopilotOpen}
+                      isFullWorkspace={true}
+                      onToggleFullWorkspace={() => setViewMode('ai-chat')}
+                      canRevert={!!previousState}
+                      onRevert={() => {
+                        if (previousState) {
+                          setName(previousState.name);
+                          setBody(previousState.body);
+                          setFormat(previousState.format);
+                          setPreviousState(null);
+                        }
+                      }}
+                      onApply={(draft, mode = 'replace') => {
+                        setPreviousState({ name, body, format });
+                        // Only adopt draft title if user hasn't set their own custom title yet
+                        if (draft.name && draft.name !== 'Draft Article' && !name.trim()) {
+                          setName(draft.name);
+                        }
+                        if (mode === 'append') {
+                          setBody((prev) => (prev ? prev.trimEnd() + '\n\n' + draft.body : draft.body));
+                        } else {
+                          setBody(draft.body);
+                        }
+                        if (draft.format) setFormat(draft.format);
+                      }}
                     />
-                  ) : (
-                    <div className="markdown-content">
-                      <MarkdownViewer content={body} />
-                    </div>
-                  )
-                ) : (
-                  <p className="empty">Nothing to preview yet. Write some content first.</p>
+                  </div>
                 )}
               </div>
             )}

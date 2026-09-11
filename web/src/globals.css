@@ -269,5 +269,8 @@ button{cursor:pointer}button:disabled{cursor:default}button,input,textarea{font:
 @media(max-width:900px){
   .editor-workspace-split{grid-template-columns:1fr}
 }
+@media(min-width:1024px){
+  .article-editor-content{overflow-y:hidden}
+}
 
 
