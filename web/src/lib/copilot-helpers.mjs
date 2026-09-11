@@ -62,3 +62,28 @@ export function isSubstantiveReport(content) {
   // Consider substantive if more than 6 lines or > 50 words and contains Markdown indicators (headers, bullet points, or tables)
   return (lines >= 6 || wordCount >= 50) && /(^#|\n- |\n\* |\|.*\|)/m.test(content);
 }
+
+export function groupConversationsByDate(conversations) {
+  if (!Array.isArray(conversations)) return { today: [], yesterday: [], earlier: [] };
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+
+  const today = [];
+  const yesterday = [];
+  const earlier = [];
+
+  for (const c of conversations) {
+    const time = new Date(c.updatedAt || c.createdAt).getTime();
+    if (time >= todayStart) {
+      today.push(c);
+    } else if (time >= yesterdayStart) {
+      yesterday.push(c);
+    } else {
+      earlier.push(c);
+    }
+  }
+
+  return { today, yesterday, earlier };
+}
+

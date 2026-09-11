@@ -470,3 +470,42 @@ Direction 1: "ต่อยอด AI Copilot ให้เป็น Agentic Assist
   - `cloud-team-management-postgres-1`: Healthy
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+
+---
+
+## Copilot Persistent Conversation History & Multi-Thread Management — 2026-09-11
+
+**Issue Addressed:**
+User requested: "ทำเป็น conversations history ให้หน่อย ครับ ทั้งหมดที่มี ai copilot" (Enable persistent conversation history for all AI Copilot components). ADR: `docs/adr/0010-copilot-conversation-history-persistence.md`.
+
+**Architecture & Implementation:**
+1. **Database Schema & Migration (`copilot_conversations` Table):**
+   - Added `CopilotConversation` model in `api/prisma/schema.prisma` with relation to `User` (`userId`, `title`, `messages JSONB`, `createdAt`, `updatedAt`).
+   - Migration `20260911135500_copilot_conversations` applied cleanly on container startup.
+2. **Backend REST Endpoints (`api/src/routes/copilot.ts`):**
+   - `GET /api/copilot/conversations`: returns user's conversation threads sorted by `updatedAt DESC` with message counts.
+   - `GET /api/copilot/conversations/:id`: fetches full conversation messages.
+   - `POST /api/copilot/conversations`: creates new conversation thread.
+   - `PATCH /api/copilot/conversations/:id`: renames or updates conversation messages.
+   - `DELETE /api/copilot/conversations/:id`: deletes conversation thread.
+   - `POST /api/copilot`: auto-persists conversation turns (user & assistant messages, task proposals) to PostgreSQL and returns `conversationId`.
+3. **Frontend UI Components & State:**
+   - `web/src/copilot.tsx`:
+     - Added slide-out **Conversations History Drawer** with grouping (Today, Yesterday, Earlier).
+     - Added `+ New Chat` button to easily start a fresh session.
+     - Single-click thread selection to resume any past conversation with full context.
+     - Thread deletion with confirmation.
+     - Automatically restores most recent conversation when opening Copilot.
+   - `web/src/article-copilot-assistant.tsx`:
+     - Added `+ New Thread` button with confirmation to clear/reset chat for the article.
+   - `web/src/lib/copilot-helpers.mjs`:
+     - Added `groupConversationsByDate` helper function with unit test coverage.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **54/54 pass** (100% green).
+- `npm --prefix api run build`: Clean TypeScript compile (0 errors).
+- `npm --prefix web run build`: Clean TypeScript and Vite compile (0 errors).
+- Database migration `20260911135500_copilot_conversations` applied cleanly on container startup.
+- Docker containers (`api`, `caddy`, `postgres`, `backup`): Healthy.
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`

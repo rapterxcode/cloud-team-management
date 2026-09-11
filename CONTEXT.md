@@ -90,6 +90,11 @@ _Avoid_: Task list dump, bulk importer
 An AI-synthesized executive summary aggregating live project progress, critical/at-risk milestones, workload distribution, and regulatory compliance status, exportable directly to markdown or a Knowledge article.
 _Avoid_: Chat summary, AI note
 
+**Copilot conversation thread**:
+A persistent, multi-turn AI chat session associated with a User and stored in the database (`copilot_conversations`), tracking full conversation history, user prompts, assistant answers, proposals, and execution states with support for multiple named conversation sessions.
+_Avoid_: Chat log, ephemeral chat
+
+
 
 
 

@@ -38,6 +38,24 @@ export type CopilotResponse = {
   answer: string;
   draftTask?: TaskDraft;
   draftTasks?: TaskDraft[];
+  conversationId?: string;
+};
+
+export type CopilotConversationSummary = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+};
+
+export type CopilotConversationDetail = {
+  id: string;
+  title: string;
+  userId: string;
+  messages: any[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 export const withDue = (t: ApiTask): Task => ({ ...t, due: t.date || 'Not set', ownerName: t.owner.name });

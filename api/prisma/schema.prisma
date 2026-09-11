@@ -20,6 +20,7 @@ model User {
   articles     KnowledgeArticle[]
   uploads          KnowledgeAttachment[]
   projectDocuments ProjectDocument[]     @relation("ProjectDocumentUploader")
+  copilotConversations CopilotConversation[]
 
   @@map("users")
 }
@@ -136,3 +137,16 @@ model ProjectDocument {
 
   @@map("project_documents")
 }
+
+model CopilotConversation {
+  id        String   @id @default(uuid())
+  title     String   @default("New Conversation")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("copilot_conversations")
+}
+

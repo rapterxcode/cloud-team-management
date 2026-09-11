@@ -97,6 +97,89 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
     res.json({ enabled: isConfigured() });
   });
 
+  // --- Conversations Management ---
+  r.get('/conversations', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const conversations = await prisma.copilotConversation.findMany({
+      where: { userId: req.session.userId },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        messages: true,
+      },
+    });
+    res.json(
+      conversations.map((c) => ({
+        id: c.id,
+        title: c.title,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        messageCount: Array.isArray(c.messages) ? c.messages.length : 0,
+      }))
+    );
+  });
+
+  r.get('/conversations/:id', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const conv = await prisma.copilotConversation.findFirst({
+      where: { id: req.params.id, userId: req.session.userId },
+    });
+    if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+    res.json(conv);
+  });
+
+  r.post('/conversations', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const rawTitle = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const title = rawTitle.slice(0, 80) || 'New Conversation';
+    const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+    const conv = await prisma.copilotConversation.create({
+      data: {
+        userId: req.session.userId,
+        title,
+        messages,
+      },
+    });
+    res.status(201).json(conv);
+  });
+
+  r.patch('/conversations/:id', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const conv = await prisma.copilotConversation.findFirst({
+      where: { id: req.params.id, userId: req.session.userId },
+    });
+    if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+
+    const data: { title?: string; messages?: any } = {};
+    if (typeof req.body?.title === 'string') {
+      const trimmed = req.body.title.trim();
+      if (trimmed) data.title = trimmed.slice(0, 80);
+    }
+    if (Array.isArray(req.body?.messages)) {
+      data.messages = req.body.messages;
+    }
+
+    const updated = await prisma.copilotConversation.update({
+      where: { id: conv.id },
+      data,
+    });
+    res.json(updated);
+  });
+
+  r.delete('/conversations/:id', async (req, res) => {
+    if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
+    const conv = await prisma.copilotConversation.findFirst({
+      where: { id: req.params.id, userId: req.session.userId },
+    });
+    if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+
+    await prisma.copilotConversation.delete({ where: { id: conv.id } });
+    res.json({ ok: true });
+  });
+
   r.post('/', async (req, res) => {
     const question = String(req.body?.question ?? '').trim();
     if (!question) return res.status(400).json({ error: 'Ask a question first' });
@@ -113,6 +196,8 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
       )
       .slice(-10)
       .map((m: ChatMessage) => ({ role: m.role, content: m.content.slice(0, 4000) }));
+
+    const conversationId = typeof req.body?.conversationId === 'string' ? req.body.conversationId.trim() : undefined;
 
     try {
       const snapshot = await buildSnapshot(prisma);
@@ -143,10 +228,51 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
 
       const singleDraftTask = draftTasks[0] || undefined;
 
+      let activeConversationId = conversationId;
+      if (req.session.userId) {
+        const userMsg = { role: 'user', content: question };
+        const assistantMsg = {
+          role: 'assistant',
+          content: result.answer,
+          draftTasks: draftTasks.length > 0 ? draftTasks : undefined,
+          draftTask: singleDraftTask,
+        };
+
+        if (activeConversationId) {
+          const existing = await prisma.copilotConversation.findFirst({
+            where: { id: activeConversationId, userId: req.session.userId },
+          });
+          if (existing) {
+            const currentMsgs = Array.isArray(existing.messages) ? existing.messages : [];
+            await prisma.copilotConversation.update({
+              where: { id: existing.id },
+              data: {
+                messages: [...currentMsgs, userMsg, assistantMsg],
+              },
+            });
+          } else {
+            activeConversationId = undefined;
+          }
+        }
+
+        if (!activeConversationId) {
+          const title = question.replace(/[\n\r]/g, ' ').slice(0, 50).trim() || 'New Conversation';
+          const newConv = await prisma.copilotConversation.create({
+            data: {
+              userId: req.session.userId,
+              title,
+              messages: [userMsg, assistantMsg],
+            },
+          });
+          activeConversationId = newConv.id;
+        }
+      }
+
       res.json({
         answer: result.answer,
         ...(singleDraftTask ? { draftTask: singleDraftTask } : {}),
         ...(draftTasks.length > 0 ? { draftTasks } : {}),
+        conversationId: activeConversationId,
       });
     } catch (e) {
       if (e instanceof CopilotNotConfiguredError) return res.status(503).json({ error: "Copilot isn't configured yet" });

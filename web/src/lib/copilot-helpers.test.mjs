@@ -64,3 +64,21 @@ test('isSubstantiveReport identifies reports with structure', () => {
   const shortChat = 'Sure, there are 4 projects currently in your workspace.';
   assert.equal(isSubstantiveReport(shortChat), false);
 });
+
+test('groupConversationsByDate groups conversations into today, yesterday, earlier', () => {
+  const now = new Date();
+  const todayItem = { id: '1', title: 'Chat today', updatedAt: now.toISOString() };
+  const yesterdayDate = new Date(now.getTime() - 25 * 60 * 60 * 1000);
+  const yesterdayItem = { id: '2', title: 'Chat yesterday', updatedAt: yesterdayDate.toISOString() };
+  const earlierDate = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+  const earlierItem = { id: '3', title: 'Chat earlier', updatedAt: earlierDate.toISOString() };
+
+  const groups = import('./copilot-helpers.mjs').then(m => {
+    const res = m.groupConversationsByDate([todayItem, yesterdayItem, earlierItem]);
+    assert.equal(res.today.length, 1);
+    assert.equal(res.today[0].id, '1');
+    assert.equal(res.earlier.length, 1);
+    assert.equal(res.earlier[0].id, '3');
+  });
+});
+

@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Eye,
   EyeOff,
+  Plus,
   PlusCircle,
   Trash2,
   Bot,
@@ -348,12 +349,16 @@ export function ArticleCopilotAssistant({
           {messages.length > 0 && (
             <button
               type="button"
-              onClick={handleClearChat}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-rose-600 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg transition-colors"
-              title="ล้างประวัติการสนทนา"
+              onClick={() => {
+                if (confirm('ต้องการเริ่มบทสนทนาใหม่สำหรับบทความนี้หรือไม่?')) {
+                  handleClearChat();
+                }
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-purple-700 hover:bg-purple-100/70 border border-slate-200 px-2.5 py-1.5 rounded-lg transition-colors"
+              title="เริ่มบทสนทนาใหม่ (New Chat)"
             >
-              <Trash2 size={13} />
-              <span className="hidden sm:inline">ล้างแชท</span>
+              <Plus size={13} />
+              <span className="hidden sm:inline">New Thread</span>
             </button>
           )}
 

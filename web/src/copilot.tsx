@@ -1,13 +1,38 @@
 import { useEffect, useRef, useState } from 'react';
-import { Sparkles, X, Send, Check, Copy, BookOpen, Layers, CheckCheck, ChevronDown, ChevronUp, AlertCircle, ShieldAlert } from 'lucide-react';
-import { api, post } from '@/lib/api';
-import type { ApiTask, TaskDraft, Me, CopilotResponse } from '@/lib/types';
+import {
+  Sparkles,
+  X,
+  Send,
+  Check,
+  Copy,
+  BookOpen,
+  CheckCheck,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  ShieldAlert,
+  History,
+  Plus,
+  Trash2,
+  MessageSquare,
+  Clock,
+} from 'lucide-react';
+import { api, post, destroy } from '@/lib/api';
+import type {
+  ApiTask,
+  TaskDraft,
+  Me,
+  CopilotResponse,
+  CopilotConversationSummary,
+  CopilotConversationDetail,
+} from '@/lib/types';
 import MarkdownViewer from './markdown-viewer';
 import {
   COPILOT_QUICK_ACTIONS,
   normalizeBatchDraftTasks,
   extractReportTitle,
   isSubstantiveReport,
+  groupConversationsByDate,
 } from '@/lib/copilot-helpers.mjs';
 
 type Msg = {
@@ -15,7 +40,7 @@ type Msg = {
   content: string;
   draftTasks?: TaskDraft[];
   draftTask?: TaskDraft;
-  createdTaskMap?: Record<number, string>; // index -> createdTaskId
+  createdTaskMap?: Record<number, string>;
   dismissed?: boolean;
   savedAsArticle?: boolean;
 };
@@ -97,7 +122,7 @@ function BatchTaskDraftCard({
     setError('');
     try {
       for (let i = 0; i < tasksState.length; i++) {
-        if (createdMap[i]) continue; // already created
+        if (createdMap[i]) continue;
         const t = tasksState[i];
         const taskName = String(t.name || '').trim();
         if (!taskName) continue;
@@ -155,7 +180,6 @@ function BatchTaskDraftCard({
         </div>
       )}
 
-      {/* Task items list */}
       <div className="flex flex-col gap-2.5 mt-1">
         {tasksState.map((task, idx) => {
           const isCreated = Boolean(createdMap[idx]);
@@ -217,7 +241,6 @@ function BatchTaskDraftCard({
                 </div>
               </div>
 
-              {/* Expandable editing fields */}
               {isExpanded && (
                 <div className="p-3 border-t border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-900 rounded-b-lg flex flex-col gap-2.5">
                   <div className="task-draft-field">
@@ -309,7 +332,6 @@ function BatchTaskDraftCard({
         </p>
       )}
 
-      {/* Card Actions */}
       <div className="task-draft-actions justify-between pt-1">
         {!isAuditor && !allCreated && (
           <button
@@ -373,9 +395,36 @@ export default function CopilotPanel({
   const [savingArticleIndex, setSavingArticleIndex] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Conversations History State
+  const [conversations, setConversations] = useState<CopilotConversationSummary[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const fetchConversations = async () => {
+    try {
+      const list = await api<CopilotConversationSummary[]>('/copilot/conversations');
+      setConversations(list);
+      return list;
+    } catch {
+      return [];
+    }
+  };
+
   useEffect(() => {
-    if (open && enabled === null)
-      api<{ enabled: boolean }>('/copilot/status').then((s) => setEnabled(s.enabled)).catch(() => setEnabled(false));
+    if (open && enabled === null) {
+      api<{ enabled: boolean }>('/copilot/status')
+        .then((s) => setEnabled(s.enabled))
+        .catch(() => setEnabled(false));
+    }
+    if (open) {
+      fetchConversations().then((list) => {
+        // If not actively on a conversation, load the latest one if available
+        if (!activeConvId && list.length > 0 && messages.length === 0) {
+          selectConversation(list[0].id);
+        }
+      });
+    }
   }, [open, enabled]);
 
   useEffect(() => {
@@ -388,24 +437,71 @@ export default function CopilotPanel({
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, busy]);
 
+  const selectConversation = async (convId: string) => {
+    setLoadingHistory(true);
+    try {
+      const detail = await api<CopilotConversationDetail>(`/copilot/conversations/${convId}`);
+      setActiveConvId(detail.id);
+      const rawMsgs = Array.isArray(detail.messages) ? detail.messages : [];
+      setMessages(rawMsgs);
+      setHistoryOpen(false);
+    } catch (e) {
+      console.error('Failed to load conversation:', e);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const startNewChat = () => {
+    setActiveConvId(null);
+    setMessages([]);
+    setInput('');
+    setHistoryOpen(false);
+  };
+
+  const handleDeleteConversation = async (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('ต้องการลบประวัติการสนทนานี้หรือไม่?')) return;
+    try {
+      await destroy(`/copilot/conversations/${convId}`);
+      setConversations((prev) => prev.filter((c) => c.id !== convId));
+      if (activeConvId === convId) {
+        startNewChat();
+      }
+    } catch (err) {
+      console.error('Failed to delete conversation:', err);
+    }
+  };
+
   const executeSend = async (questionText: string) => {
     const question = questionText.trim();
     if (!question || busy) return;
     const history = messages.slice(-10).map((m) => ({ role: m.role, content: m.content }));
-    setMessages((prev) => [...prev, { role: 'user', content: question }]);
+    const newMsg: Msg = { role: 'user', content: question };
+    setMessages((prev) => [...prev, newMsg]);
     setInput('');
     setBusy(true);
+
     try {
-      const res = await post<CopilotResponse>('/copilot', { question, history });
+      const res = await post<CopilotResponse>('/copilot', {
+        question,
+        history,
+        conversationId: activeConvId || undefined,
+      });
+
       const normalizedTasks = normalizeBatchDraftTasks(res.draftTasks, res.draftTask);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: res.answer,
-          draftTasks: normalizedTasks.length > 0 ? normalizedTasks : undefined,
-        },
-      ]);
+      const assistantMsg: Msg = {
+        role: 'assistant',
+        content: res.answer,
+        draftTasks: normalizedTasks.length > 0 ? normalizedTasks : undefined,
+      };
+
+      setMessages((prev) => [...prev, assistantMsg]);
+
+      if (res.conversationId && res.conversationId !== activeConvId) {
+        setActiveConvId(res.conversationId);
+      }
+      fetchConversations();
     } catch (e) {
       setMessages((prev) => [
         ...prev,
@@ -453,10 +549,12 @@ export default function CopilotPanel({
 
   if (!open) return null;
 
+  const groupedHistory = groupConversationsByDate(conversations);
+
   return (
     <div className="copilot-scrim" onClick={onClose}>
-      <aside className="copilot-panel" onClick={(e) => e.stopPropagation()} aria-label="AI Copilot">
-        <header className="copilot-head">
+      <aside className="copilot-panel relative" onClick={(e) => e.stopPropagation()} aria-label="AI Copilot">
+        <header className="copilot-head flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="brand-icon"><Sparkles size={18} /></span>
             <strong>Copilot</strong>
@@ -464,8 +562,121 @@ export default function CopilotPanel({
               Agentic
             </span>
           </div>
-          <button aria-label="Close" className="text-button" onClick={onClose}><X size={18} /></button>
+
+          <div className="flex items-center gap-1.5">
+            {/* New Chat Button */}
+            <button
+              type="button"
+              onClick={startNewChat}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-purple-100/70 hover:bg-purple-200/80 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-200 dark:border-purple-800 transition-colors"
+              title="เริ่มการสนทนาใหม่"
+            >
+              <Plus size={13} />
+              <span className="hidden sm:inline">New Chat</span>
+            </button>
+
+            {/* History Toggle Button */}
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(!historyOpen)}
+              className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors border ${
+                historyOpen
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+              }`}
+              title="ประวัติการสนทนาทั้งหมด"
+            >
+              <History size={13} />
+              <span className="hidden sm:inline">History</span>
+              {conversations.length > 0 && (
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  historyOpen ? 'bg-purple-800 text-purple-100' : 'bg-purple-100 text-purple-800'
+                }`}>
+                  {conversations.length}
+                </span>
+              )}
+            </button>
+
+            <button aria-label="Close" className="text-button p-1" onClick={onClose}>
+              <X size={18} />
+            </button>
+          </div>
         </header>
+
+        {/* Slide-out Conversations History Panel */}
+        {historyOpen && (
+          <div className="absolute inset-x-0 top-[53px] bottom-0 z-20 bg-white/98 dark:bg-slate-900/98 backdrop-blur-md flex flex-col p-4 overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+              <div className="flex items-center gap-2">
+                <History size={16} className="text-purple-600" />
+                <strong className="text-sm text-slate-900 dark:text-slate-100">
+                  Conversations History ({conversations.length})
+                </strong>
+              </div>
+              <button
+                type="button"
+                onClick={startNewChat}
+                className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md bg-purple-600 text-white hover:bg-purple-700 shadow-2xs"
+              >
+                <Plus size={13} />
+                <span>+ New Conversation</span>
+              </button>
+            </div>
+
+            {conversations.length === 0 ? (
+              <div className="text-center py-12 text-slate-500 text-xs">
+                <MessageSquare size={28} className="mx-auto text-slate-300 mb-2" />
+                ยังไม่มีประวัติการสนทนา เริ่มคุยกับ AI เพื่อสร้างบันทึกแรกได้เลย
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {[
+                  { label: 'วันนี้ (Today)', items: groupedHistory.today },
+                  { label: 'เมื่อวาน (Yesterday)', items: groupedHistory.yesterday },
+                  { label: 'ก่อนหน้านี้ (Earlier)', items: groupedHistory.earlier },
+                ].map(
+                  (group) =>
+                    group.items.length > 0 && (
+                      <div key={group.label} className="flex flex-col gap-1.5">
+                        <span className="text-[11px] font-bold text-slate-400 tracking-wider uppercase px-1">
+                          {group.label}
+                        </span>
+                        {group.items.map((c) => (
+                          <div
+                            key={c.id}
+                            onClick={() => selectConversation(c.id)}
+                            className={`flex items-center justify-between p-2.5 rounded-lg border text-xs cursor-pointer transition-all group ${
+                              c.id === activeConvId
+                                ? 'border-purple-300 bg-purple-50/80 dark:border-purple-800 dark:bg-purple-950/40 font-medium'
+                                : 'border-slate-100 dark:border-slate-800 hover:border-purple-200 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0 pr-2">
+                              <MessageSquare size={14} className="text-purple-600 shrink-0" />
+                              <span className="truncate text-slate-800 dark:text-slate-200">
+                                {c.title || 'Untitled conversation'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 shrink-0">
+                                ({c.messageCount} ข้อความ)
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteConversation(c.id, e)}
+                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 p-1 rounded transition-opacity"
+                              title="ลบการสนทนานี้"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="copilot-body">
           {enabled === false && (
@@ -481,7 +692,7 @@ export default function CopilotPanel({
                 Workspace AI Assistant
               </h3>
               <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 leading-relaxed">
-                ถามข้อมูลโครงการ วิเคราะห์ความเสี่ยง สกัด Tasks จาก Runbook หรือสร้างรายงานผู้บริหารแบบอัตโนมัติ
+                ถามข้อมูลโครงการ วิเคราะห์ความเสี่ยง สกัด Tasks จาก Runbook หรือสร้างรายงานผู้บริหารแบบอัตโนมัติ (บันทึกประวัติการคุยทุกเซสชัน)
               </p>
               <div className="flex flex-col gap-1.5 text-left">
                 <span className="text-[10px] font-semibold tracking-wider text-purple-800 dark:text-purple-300 uppercase px-1">
@@ -509,7 +720,6 @@ export default function CopilotPanel({
                 <div className="markdown-assistant-container">
                   <MarkdownViewer content={m.content} />
 
-                  {/* Substantive Report Toolbar Actions */}
                   {isSubstantiveReport(m.content) && (
                     <div className="flex items-center gap-2 mt-3 pt-2 border-t border-purple-100 dark:border-purple-900/40 text-xs">
                       <button
@@ -549,7 +759,6 @@ export default function CopilotPanel({
                 <div>{m.content}</div>
               )}
 
-              {/* Batch Tasks Proposal Card */}
               {m.draftTasks && m.draftTasks.length > 0 && !m.dismissed && (
                 <BatchTaskDraftCard
                   drafts={m.draftTasks}
@@ -580,7 +789,6 @@ export default function CopilotPanel({
           <div ref={endRef} />
         </div>
 
-        {/* Quick action chips above input when conversation has started */}
         {enabled !== false && messages.length > 0 && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 overflow-x-auto border-t border-purple-100 dark:border-purple-900/40 bg-purple-50/40 dark:bg-purple-950/20 text-[11px] no-scrollbar">
             {COPILOT_QUICK_ACTIONS.map((action) => (
