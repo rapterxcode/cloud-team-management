@@ -78,6 +78,11 @@ _Avoid_: Tag, topic label
 A document intake workflow that reads uploaded `.md`, `.html`, or `.txt` files directly into a Knowledge article with automatic title and format extraction.
 _Avoid_: Bulk uploader, file sync
 
+**Knowledge Copilot Assistant**:
+An in-editor AI co-author powered by Gemini and grounded in live workspace context (projects, resources, roster) that drafts new Knowledge articles, refines existing documentation, enhances formatting (checklists, code blocks, tables), and transforms Markdown into interactive HTML pages with user-in-the-loop review.
+_Avoid_: Auto-writer, bot generator
+
+
 
 
 
