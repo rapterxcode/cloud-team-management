@@ -237,3 +237,36 @@ Branch `feat/iso27001-bot-compliance-management`. IT Governance and Audit Readin
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
   - `curl -sk -i -X POST https://localhost/api/copilot/article` -> HTTP/2 401 `{"error":"Sign in required"}`
+
+---
+
+## Knowledge Article Expanded Editor Workspace — 2026-09-11
+
+**Scope & Problem Solved:**
+User reported that the create/edit modal for Knowledge articles was too cramped (`create , Edit article knowledge พื้นที่น้อยเกินไปครับ แก้ไขด้วย`) due to generic dialog default constraints (`max-w-lg` 512px).
+
+**Key Enhancements:**
+1. **Dedicated Spacious Article Editor Dialog (`web/src/article-editor-dialog.tsx`):**
+   - Decoupled from generic dialogs (`project`, `task`, `resource`).
+   - Default modal viewport: `95vw` width (up to `1440px`), `92vh` height with clean flex column layout.
+2. **Fullscreen / Maximize Canvas Mode:**
+   - One-click Maximize toggle (`Maximize2` / `Minimize2` buttons) that expands the editor to a distraction-free `100vw` × `100vh` canvas.
+3. **Side-by-Side Split View:**
+   - Added View Mode Switcher: **Write** (focused code/markdown editor), **Split** (responsive 1:1 side-by-side editing and live rendering), and **Preview** (full rendered presentation).
+   - Live Markdown / HTML iframe preview rendering updates instantly in Split View.
+4. **Enhanced Tooling & Workspace Depth:**
+   - Dedicated metadata header (Title, Category selector, optional Project link, Format toggle).
+   - Embedded `ArticleCopilotAssistant` (collapsible, 1-click presets, diff preview, apply/revert).
+   - Direct document import (`.md`, `.html`, `.txt`) with auto-format detection.
+   - Rich Markdown / HTML formatting toolbar (Headings, Bold, Italic, Code block with language selector, List, Table, Callout, CDN CSS presets).
+   - Editor statistics footer with word counter and estimated reading time.
+5. **Role-Based Guards (ISO 27001 / BOT SoD):**
+   - Retained strict `auditor` role guards (auditors cannot open editor or trigger mutation actions).
+
+**Verification Evidence:**
+- `npm --prefix web test`: **47/47 pass** (100% green).
+- `npm --prefix api test`: **51/51 pass** (100% green).
+- `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
+- `docker compose up -d --build caddy`: Container `cloud-team-management-caddy-1` successfully rebuilt and restarted.
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
