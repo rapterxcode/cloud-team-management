@@ -509,3 +509,35 @@ User requested: "ทำเป็น conversations history ให้หน่อ�
 - Docker containers (`api`, `caddy`, `postgres`, `backup`): Healthy.
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+
+---
+
+## AI Copilot Full-System Context & Resizable Draggable Panel — 2026-09-11
+
+**Issue Addressed:**
+1. User requested: "แก้ไขให้ ทุกข้อมูลในระบบนี้ ai copilot สามารถ ตอบได้" (Fix so AI Copilot can answer about all information in the system).
+2. User requested: "ต้องการให้ `<div class="copilot-scrim"><aside class="copilot-panel relative" ...>` สามารถ ยืดหด ได้ ครับ" (Make the Copilot panel resizable/stretchable).
+
+**Architecture & Implementation:**
+1. **Full Knowledge & Runbook Context Snapshot (`api/src/copilot/snapshot.ts`):**
+   - Removed 400-char preview truncation; articles now emit their full body into the context snapshot.
+   - Implemented `cleanHtmlForContext()` to strip heavy `<script>`/`<style>` tags while preserving all semantic content, headings, and shell commands.
+   - Expanded snapshot budget from 12,000 chars to 1,000,000 chars, matching Gemini 2.5 Flash's 1M-token context window.
+   - Added project compliance documents (ISO 27001 / BOT) with reference numbers and projects.
+2. **Draggable & Resizable Copilot Panel (`web/src/copilot.tsx`, `web/src/globals.css`):**
+   - Added left edge drag handle with `cursor-col-resize` and mouse move/up listeners tracking `window.innerWidth - e.clientX`.
+   - Clamped panel width between 380px and viewport width.
+   - Persisted custom panel width in `localStorage` under `ctm_copilot_panel_width`.
+   - Added Maximize/Restore toggle button (`Maximize2` / `Minimize2`) to allow full-screen width (`100vw`).
+   - Added `.is-resizing` class to disable transitions during drag and `.is-maximized` for 100vw view.
+
+**Verification Evidence:**
+- **Snapshot Total Content:** 58,166 characters in snapshot, containing 100% of all articles, tasks, cloud resources, and compliance documents.
+- **Runbook Extraction:** "How to Extended Disk Ubuntu 24.04 and RHEL 9" present at full 32,381 characters with all commands (`growpart`, `resize2fs`, `rescan`).
+- **AI Copilot Live Query Verification:** Gemini 2.5 Flash successfully answered query on Ubuntu 24.04 disk extension with exact zero-downtime bash commands from the system runbook.
+- `npm --prefix web test`: **54/54 pass** (100% green).
+- `npm --prefix api run build`: Clean TypeScript compile (0 errors).
+- `npm --prefix web run build`: Clean TypeScript and Vite compile (0 errors).
+- Docker containers (`api`, `caddy`, `postgres`, `backup`): Healthy.
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
