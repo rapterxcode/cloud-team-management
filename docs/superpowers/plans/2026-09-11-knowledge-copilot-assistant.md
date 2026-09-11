@@ -21,18 +21,18 @@
 ## Task Breakdown
 
 ### Task 1: Backend Endpoint `POST /api/copilot/article` & Tool Calling
-- [ ] In `api/src/copilot/gemini.ts`:
+- [x] In `api/src/copilot/gemini.ts`:
   - Define `draftArticleTool` (FunctionDeclaration with `name`, `body`, `format`, `summary`).
   - Define type `ArticleDraft = { name?: string; body: string; format?: 'markdown' | 'html'; summary?: string }`.
   - Extend `CopilotResult` with `draftArticle?: ArticleDraft`.
   - Handle `draftArticle` tool call in `realAskLLM`.
-- [ ] In `api/src/routes/copilot.ts`:
+- [x] In `api/src/routes/copilot.ts`:
   - Add route `r.post('/article', async (req, res) => ...)`:
     - Input: `{ prompt: string, name?: string, category?: string, format?: 'markdown' | 'html', currentBody?: string }`.
     - Validation: `prompt` required (max 2000 chars); reject auditor with 403 Forbidden.
     - Grounding: Inject workspace snapshot (projects, resources, roster) and authoring instructions into system prompt.
     - Response: `{ draftArticle: { name: string, body: string, format: 'markdown' | 'html', summary: string } }`.
-- [ ] Write integration tests in `api/test/copilot-article.test.ts`:
+- [x] Write integration tests in `api/test/copilot-article.test.ts`:
   - Test 1: Requires authentication (401).
   - Test 2: Auditor role is blocked (403).
   - Test 3: Generates new draft when `currentBody` is empty.
@@ -40,14 +40,14 @@
   - Test 5: Graceful error handling when unconfigured (503) or provider fails (502).
 
 ### Task 2: Frontend Pure Logic & Actions Helper
-- [ ] Create `web/src/lib/copilot-article.mjs`:
+- [x] Create `web/src/lib/copilot-article.mjs`:
   - Export `COPILOT_ARTICLE_PRESETS` (quick prompt templates: "Draft from Title", "Add Step-by-Step Runbook", "Add Verification Checklist", "Convert to HTML + Tailwind").
   - Export `buildArticleCopilotPrompt(actionId, context)`.
-- [ ] Create unit tests in `web/src/lib/copilot-article.test.mjs`:
+- [x] Create unit tests in `web/src/lib/copilot-article.test.mjs`:
   - Verify preset actions and prompt formatting.
 
 ### Task 3: In-Editor AI Copilot Assistant Component
-- [ ] Create `web/src/article-copilot-assistant.tsx`:
+- [x] Create `web/src/article-copilot-assistant.tsx`:
   - Collapsible/expandable AI assistant box rendered inside the Article create/edit dialog.
   - Quick action chips for 1-click prompting.
   - Custom instruction textarea and "✨ Generate / Edit" button.
@@ -56,16 +56,16 @@
   - "Apply to Editor" button and "Revert" button.
 
 ### Task 4: Integration in Article Modal
-- [ ] In `web/src/App.tsx`:
+- [x] In `web/src/App.tsx`:
   - Mount `<ArticleCopilotAssistant />` inside the article modal when `modal === 'article'`.
   - Hide assistant if `me.role === 'auditor'`.
   - Wire up `onApply` to update `articleBody`, `articleFormat`, and the article name input.
 
 ### Task 5: System Verification, Container Rebuild & Release Evidence
-- [ ] Run full test suites:
+- [x] Run full test suites:
   - `DATABASE_URL=... npm --prefix api test`
   - `npm --prefix web test`
   - `npm --prefix api run build` && `npm --prefix web run build`
-- [ ] Rebuild live containers: `docker compose up -d --build`.
-- [ ] Update `VALIDATION.md` with test evidence.
-- [ ] Clean merge to `main` and remove temporary worktree.
+- [x] Rebuild live containers: `docker compose up -d --build`.
+- [x] Update `VALIDATION.md` with test evidence.
+- [x] Clean merge to `main` and remove temporary worktree.

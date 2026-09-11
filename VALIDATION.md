@@ -202,5 +202,38 @@ Branch `feat/iso27001-bot-compliance-management`. IT Governance and Audit Readin
 - `docker compose up -d --build`: Docker containers `cloud-team-management-api-1` and `cloud-team-management-caddy-1` rebuilt and healthy, database migration deployed.
 - Live endpoint check: `curl -k https://localhost/api/health` -> `{"ok":true}`.
 
+---
 
+## Knowledge Article AI Copilot Assistant — 2026-09-11
 
+**Scope:**
+1. **Backend Generative Authoring Endpoint:**
+   - Implemented `POST /api/copilot/article` grounded with workspace snapshot data (projects, cloud resources, roster).
+   - Defined `draftArticleTool` (`name`, `body`, `format`, `summary`) and typed `ArticleDraft` / `CopilotResult`.
+   - Injectable `AskLLM` test interface behind Google GenAI.
+   - Strict Segregation of Duties (ISO 27001 / BOT): `role === 'auditor'` blocked with `403 Forbidden`.
+   - Fallback support for plain-text model responses and error mapping (502 provider error, 503 unconfigured).
+2. **Frontend Presets & Prompt Builders:**
+   - Authored `web/src/lib/copilot-article.mjs` with `COPILOT_ARTICLE_PRESETS`:
+     - `⚡ Draft from Title`
+     - `📝 Add Checklist`
+     - `🛠️ Format Code & Tables`
+     - `🎨 Convert to HTML + Tailwind`
+     - `📋 Add Summary`
+   - Pure function `buildArticleCopilotPrompt(presetId, context)`.
+3. **In-Editor AI Copilot Assistant Component:**
+   - Created `web/src/article-copilot-assistant.tsx` with collapsible header, 1-click action chips, natural language prompt input, proposal diff review card with summary, "Apply to Editor" confirmation, and "Revert AI Edit" undo mechanism.
+   - Auditor guard: completely hides UI when `currentUser?.role === 'auditor'`.
+4. **Editor Integration:**
+   - Integrated in `web/src/App.tsx` inside the Knowledge Article create/edit modal.
+   - Controlled `articleName`, `articleBody`, `articleFormat`, and undo snapshotting.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **47/47 pass** (100% green, including 6 new unit tests for copilot presets and prompt builder).
+- `npm --prefix api test`: **51/51 pass** (100% green, including 8 new integration tests for `POST /api/copilot/article`, auditor blocking, draft creation, modification, HTML conversion, fallbacks, and error mappings).
+- `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
+- `npm --prefix api run build`: Clean API compile (`tsc -p tsconfig.json` 0 errors).
+- `docker compose up -d --build`: Live containers `cloud-team-management-api-1` and `cloud-team-management-caddy-1` rebuilt and healthy.
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+  - `curl -sk -i -X POST https://localhost/api/copilot/article` -> HTTP/2 401 `{"error":"Sign in required"}`
