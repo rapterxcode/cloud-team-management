@@ -368,4 +368,32 @@ User reported: "ช่องแชท มันเล็กเกินไป" (
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
 
+---
+
+## AI Copilot Smart Editor: Unified Side-by-Side Editor & Full AI Chat Workspace — 2026-09-11
+
+**Issue Addressed:**
+User requested: "รวม Editor and Full ai chat workspace เลย ครับ" (Combine Editor and Full AI Chat workspace together).
+
+**Architecture & Implementation:**
+1. **Unified Dual-Pane / Multi-Column Layout (`flex flex-col lg:flex-row`):**
+   - **Left Pane (Editor Workspace):** Contains formatting toolbar, format selection (Markdown / HTML), and the editor/preview canvas (`Write`, `Split View`, or `Preview`). Fills 54%–60% width on desktop.
+   - **Right Pane (Full AI Chat Workspace):** Contains `ArticleCopilotAssistant` running full height (`h-full flex-1 flex flex-col min-h-0`). Fills 40%–46% width on desktop.
+   - **Seamless Real-Time Synchronization:** Clicking `✓ Apply to Editor` or `+ Append to Bottom` on the right immediately updates the live editor and live preview on the left without view switching or jumping.
+2. **Flexible View Modes & Header Switcher:**
+   - `Write`: Full-height editor textarea on left, Full AI Chat Workspace on right.
+   - `Split View`: Editor textarea + live preview side-by-side on left, Full AI Chat Workspace on right.
+   - `Preview`: Full-height live preview on left, Full AI Chat Workspace on right.
+   - `AI Chat (เปิดอยู่ / ปิด)` toggle button: Allows collapsing the AI Chat panel with 1 click to give the Editor 100% full width.
+   - Maximize button in Assistant header: Allows expanding AI Chat to 100% full width when desired.
+3. **Independent Dual Scroll Areas:**
+   - Desktop view (`lg:overflow-hidden` on outer content) ensures headers and prompt input remain pinned, while the Editor and the AI Chat thread scroll independently with zero outer window shifting.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **47/47 pass** (100% green).
+- `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
+- `docker compose up -d --build caddy`: Rebuilt Caddy container; container recreated and healthy.
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+
 
