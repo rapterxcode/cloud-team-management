@@ -302,3 +302,40 @@ User reported that the create/edit modal for Knowledge articles was too cramped 
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
 
+---
+
+## AI Copilot Smart Editor: Persistent AI Chat Box & Header Toggle — 2026-09-11
+
+**Issue Addressed:**
+User reported: "bug ช่อง ai chat หายไป / AI Copilot Assistant Smart Editor" (Bug: the AI chat box/input disappeared in AI Copilot Assistant Smart Editor).
+
+**Root Cause Analysis:**
+1. **Accidental Collapse:** Clicking the header or chevron set `isOpen = false`, unmounting all prompt inputs, action chips, and buttons, leaving only a thin bar.
+2. **Scroll-off / Lack of Visibility:** Inside the spacious dialog, `ArticleCopilotAssistant` sat at the top of a scrollable canvas above a 500px textarea. Scrolling down to the editor scrolled the assistant completely off-screen.
+3. **No True "Chat" Experience:** Previously, it was a 1-turn single-line `<input type="text">` that cleared upon applying a proposal, with zero chat history or dialogue bubbles.
+4. **Modal Dialog Scrim Blocking Global Copilot:** `ArticleEditorDialog` is a full modal (`z-50`) that covers the page and obscures the main topbar "Ask Copilot" button, with no dedicated AI button in the dialog header.
+
+**Key Enhancements:**
+1. **Full-Featured Multi-Turn AI Chat Box (`web/src/article-copilot-assistant.tsx`):**
+   - **Persistent Chat Input:** Prominent textarea with `Enter` to send, `Shift+Enter` for newline, and `Send` icon button that **NEVER disappears** after generating or applying a draft.
+   - **Conversation History:** User and Assistant chat bubbles with avatars and timestamps.
+   - **Proposal Card in Chat:** Shows title suggestion badge, format badge, summary, collapsible "👁 Preview Proposed Content" toggle, "Apply to Editor" (replace), "+ Append to Bottom", and "Discard" actions with clear status tracking.
+   - **Multi-turn Contextual Reasoning:** Sends previous turns (`history`) to `POST /api/copilot/article` so Gemini remembers preceding instructions.
+   - **Quick Actions:** Extended with `🔍 Polish & Proofread` and `🚒 Add Runbook Steps`.
+   - **Clear Chat Button:** Easily start a fresh conversation session with 1 click (`Trash2`).
+2. **Dedicated Header Toggle Button (`web/src/article-editor-dialog.tsx`):**
+   - Added a prominent `✨ AI Chat` button in the `DialogHeader` right next to `Write` / `Split View` / `Preview` / `Maximize`.
+   - Clicking it ensures the chat is expanded, smoothly scrolls it into view (`scrollIntoView`), and automatically focuses the chat textarea (`#article-copilot-input`).
+3. **Collapsed Safety Banner:**
+   - Even when minimized, renders a clear purple banner: "AI Copilot Chat is minimized — Click to expand and chat" with an "Open AI Chat" button and message counter.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **47/47 pass** (100% green).
+- `npm --prefix api test`: **52/52 pass** (including new multi-turn history verification in `copilot-article.test.ts`).
+- `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
+- `npm --prefix api run build`: Clean API compile (`tsc -p tsconfig.json` 0 errors).
+- `docker compose up -d --build`: Stack rebuilt; `cloud-team-management-api-1` and `cloud-team-management-caddy-1` healthy.
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+
+
