@@ -102,6 +102,20 @@ export async function seed(prisma: PrismaClient) {
     });
   }
 
+  if ((await prisma.knowledgeCategory.count()) === 0) {
+    await prisma.knowledgeCategory.createMany({
+      data: [
+        { name: 'Runbooks', color: 'purple', icon: 'BookOpen' },
+        { name: 'Onboarding', color: 'green', icon: 'Folder' },
+        { name: 'Guides', color: 'blue', icon: 'Bookmark' },
+        { name: 'Meeting notes', color: 'orange', icon: 'Folder' },
+        { name: 'Architecture', color: 'purple', icon: 'BookOpen' },
+        { name: 'Interactive Pages', color: 'blue', icon: 'Bookmark' },
+      ],
+      skipDuplicates: true,
+    });
+  }
+
   if ((await prisma.cloudResource.count()) === 0) {
     await prisma.cloudResource.createMany({
       data: [

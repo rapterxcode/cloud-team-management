@@ -4,7 +4,20 @@ export type Project = { id: string; name: string; description: string; status: s
 export type ApiTask = { id: string; projectId: string; name: string; description: string; ownerId: string; owner: { id: string; name: string }; phase: string; status: string; priority: string; start: string; date: string; sopArticleId?: string | null; changeDocumentId?: string | null; changeDocument?: { id: string; originalName: string; category: string; referenceNo: string } | null; sopArticle?: { id: string; name: string; category: string } | null };
 export type Task = ApiTask & { due: string; ownerName: string };
 export type Attachment = { id: string; originalName: string; sizeBytes: number };
-export type Article = { id: string; name: string; category: string; body: string; author: { id: string; name: string }; attachments: Attachment[] };
+export type Article = {
+  id: string;
+  name: string;
+  category: string;
+  body: string;
+  format?: 'markdown' | 'html';
+  author: { id: string; name: string };
+  attachments: Attachment[];
+  projectId?: string | null;
+  project?: { id: string; name: string } | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+export type KnowledgeCategory = { id: string; name: string; color: string; icon: string; createdAt?: string };
 export type Resource = { id: string; name: string; provider: string; type: string; status: string; monthlyCost: number };
 
 export type TaskDraft = {

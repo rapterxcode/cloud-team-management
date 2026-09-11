@@ -69,6 +69,7 @@ model KnowledgeArticle {
   name        String
   category    String
   body        String
+  format      String                @default("markdown")
   authorId    String                @map("author_id")
   author      User                  @relation(fields: [authorId], references: [id])
   projectId   String?               @map("project_id")
@@ -79,6 +80,16 @@ model KnowledgeArticle {
   tasks       Task[]
 
   @@map("knowledge_articles")
+}
+
+model KnowledgeCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("purple")
+  icon      String   @default("BookOpen")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("knowledge_categories")
 }
 
 model KnowledgeAttachment {
