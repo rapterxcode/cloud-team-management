@@ -169,4 +169,38 @@ Branch `feat/iso27001-bot-compliance-management`. IT Governance and Audit Readin
 - `npm --prefix api run build`: Clean API compile (`tsc -p tsconfig.json` 0 errors).
 - `docker compose up -d --build caddy`: Live container recreation and health check passed (`curl -sk https://localhost/api/health` -> `{"ok":true}`).
 
+---
+
+## Knowledge Hub Upgrade: Interactive HTML Pages, Dynamic Categories, Article Reader Dialog with Table of Contents (TOC), and Document Importer — 2026-09-11
+
+**Scope:**
+1. **Interactive HTML/CSS/JS Page Rendering:**
+   - Added `format` column (`markdown` | `html`) to `KnowledgeArticle` in database.
+   - Isolated, sandboxed `<iframe>` rendering (`sandbox="allow-scripts allow-downloads"`, explicitly omitting `allow-same-origin` to isolate tokens/cookies under ISO 27001 app security).
+2. **Article Reader Dialog:**
+   - Wide dual-column dialog (`92vw`, max `1280px`, `88vh`) with full-screen Maximize toggle (`100vw` / `100vh`).
+   - Dynamic Table of Contents (TOC) with scrollspy active heading tracking and smooth scrolling.
+   - Document metadata panel (author, estimated reading time, format badge, creation/update dates).
+   - Embedded attachments and action controls.
+3. **Dynamic Category Management:**
+   - Created `KnowledgeCategory` Prisma model with `id`, `name`, `color`, `icon`.
+   - API routes for category CRUD (`GET/POST/PATCH/DELETE /api/knowledge/categories`).
+   - Category deletion safeguard (blocks deletion if any article is using that category).
+   - Role-based protection (auditor blocked with 403 Forbidden).
+   - Seeded default categories (`Runbooks`, `Onboarding`, `Guides`, `Meeting notes`, `Architecture`, `Interactive Pages`).
+4. **Document Importer & Formatting Toolbar:**
+   - Import `.md`, `.html`, `.txt` files directly into the editor with auto format detection and title extraction.
+   - Formatting toolbar with quick actions (H1-H3, Bold, Italic, Code, List, Table, Callout) and tabbed Write/Preview.
+5. **Auditor Role Guards (ISO 27001 / BOT SoD):**
+   - Hides "Edit", "Delete", "Manage categories", and file import from `auditor` role.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **37/37 pass** (100% green, including 5 new tests for TOC extraction, reading time estimation, slugify, and document importer).
+- `npm --prefix api test`: **43/43 pass** (100% green, including new suites for category CRUD, auditor protection, article format support, and deletion safeguards).
+- `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
+- `npm --prefix api run build`: Clean production compile (`tsc -p tsconfig.json` 0 errors).
+- `docker compose up -d --build`: Docker containers `cloud-team-management-api-1` and `cloud-team-management-caddy-1` rebuilt and healthy, database migration deployed.
+- Live endpoint check: `curl -k https://localhost/api/health` -> `{"ok":true}`.
+
+
 
