@@ -15,9 +15,17 @@ export type TaskDraft = {
   description?: string;
 };
 
+export type ArticleDraft = {
+  name?: string;
+  body: string;
+  format?: 'markdown' | 'html';
+  summary?: string;
+};
+
 export type CopilotResult = {
   answer: string;
   draftTask?: TaskDraft;
+  draftArticle?: ArticleDraft;
 };
 
 export type AskLLM = (system: string, messages: ChatMessage[]) => Promise<CopilotResult | string>;
@@ -54,6 +62,22 @@ const draftTaskTool: FunctionDeclaration = {
   },
 };
 
+const draftArticleTool: FunctionDeclaration = {
+  name: 'draftArticle',
+  description:
+    'Draft or modify a knowledge base article in markdown or interactive HTML format, providing the article name, content body, format, and an explanation summary of what was generated or changed.',
+  parametersJsonSchema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Title or name of the knowledge article' },
+      body: { type: 'string', description: 'Complete content of the article in Markdown or HTML' },
+      format: { type: 'string', enum: ['markdown', 'html'], description: 'Format of the body content: markdown or html' },
+      summary: { type: 'string', description: 'Concise explanation of what was drafted or changed' },
+    },
+    required: ['body'],
+  },
+};
+
 export const realAskLLM: AskLLM = async (system, messages) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new CopilotNotConfiguredError();
@@ -68,23 +92,28 @@ export const realAskLLM: AskLLM = async (system, messages) => {
     contents,
     config: {
       systemInstruction: system,
-      tools: [{ functionDeclarations: [draftTaskTool] }],
+      tools: [{ functionDeclarations: [draftTaskTool, draftArticleTool] }],
     },
   });
 
   const fnCall = res.functionCalls?.[0];
   let draftTask: TaskDraft | undefined;
+  let draftArticle: ArticleDraft | undefined;
   if (fnCall && fnCall.name === 'draftTask' && fnCall.args) {
     draftTask = fnCall.args as TaskDraft;
+  } else if (fnCall && fnCall.name === 'draftArticle' && fnCall.args) {
+    draftArticle = fnCall.args as ArticleDraft;
   }
 
   let answer = res.text || '';
   if (!answer && draftTask) {
     answer = `I've prepared a draft for "${draftTask.name}". Please review and confirm below.`;
+  } else if (!answer && draftArticle) {
+    answer = draftArticle.summary || `I've prepared a draft for "${draftArticle.name || 'the article'}". Please review and confirm below.`;
   }
-  if (!answer && !draftTask) {
+  if (!answer && !draftTask && !draftArticle) {
     throw new Error('Empty response from Gemini');
   }
 
-  return { answer, draftTask };
+  return { answer, draftTask, draftArticle };
 };
