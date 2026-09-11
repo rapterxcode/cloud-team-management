@@ -10,6 +10,8 @@ test('COPILOT_ARTICLE_PRESETS contains standard authoring and editing actions', 
   assert.ok(ids.includes('format-code'));
   assert.ok(ids.includes('convert-html'));
   assert.ok(ids.includes('executive-summary'));
+  assert.ok(ids.includes('polish'));
+  assert.ok(ids.includes('runbook'));
 });
 
 test('buildArticleCopilotPrompt uses customPrompt if provided', () => {

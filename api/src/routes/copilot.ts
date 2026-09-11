@@ -143,6 +143,18 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
     const format: 'markdown' | 'html' = rawFormat === 'html' ? 'html' : 'markdown';
     const currentBody = typeof req.body?.currentBody === 'string' ? req.body.currentBody.trim() : '';
 
+    const rawHistory = Array.isArray(req.body?.history) ? req.body.history : [];
+    const history: ChatMessage[] = rawHistory
+      .filter(
+        (m: unknown): m is ChatMessage =>
+          !!m &&
+          typeof m === 'object' &&
+          ((m as ChatMessage).role === 'user' || (m as ChatMessage).role === 'assistant') &&
+          typeof (m as ChatMessage).content === 'string',
+      )
+      .slice(-6)
+      .map((m: ChatMessage) => ({ role: m.role, content: m.content.slice(0, 2000) }));
+
     const instructionParts = [
       `Requested Action / Instruction: ${prompt}`,
       name ? `Article Title: ${name}` : undefined,
@@ -157,7 +169,7 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
       const snapshot = await buildSnapshot(prisma);
       const rawResult = await askLLM(
         ARTICLE_SYSTEM_PREFIX + snapshot,
-        [{ role: 'user', content: userMessageContent }],
+        [...history, { role: 'user', content: userMessageContent }],
         { toolChoice: 'article' }
       );
       const result = typeof rawResult === 'string' ? { answer: rawResult } : rawResult;

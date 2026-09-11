@@ -16,6 +16,7 @@ import {
   Save,
   Plus,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import type { Article, KnowledgeCategory, Project, Me } from '@/lib/types';
 import MarkdownViewer from './markdown-viewer';
@@ -55,6 +56,7 @@ export default function ArticleEditorDialog({
   const [format, setFormat] = useState<'markdown' | 'html'>('markdown');
   const [body, setBody] = useState('');
   const [viewMode, setViewMode] = useState<'write' | 'split' | 'preview'>('split');
+  const [copilotOpen, setCopilotOpen] = useState(true);
   const [previousState, setPreviousState] = useState<{
     name: string;
     body: string;
@@ -218,8 +220,33 @@ export default function ArticleEditorDialog({
                 </div>
               </div>
 
-              {/* View mode toggle & Fullscreen toggle */}
+              {/* View mode toggle, AI Chat toggle & Fullscreen toggle */}
               <div className="flex items-center gap-2">
+                {currentUser?.role !== 'auditor' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !copilotOpen;
+                      setCopilotOpen(next);
+                      if (next) {
+                        setTimeout(() => {
+                          document.getElementById('article-copilot-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          document.getElementById('article-copilot-input')?.focus();
+                        }, 50);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                      copilotOpen
+                        ? 'bg-purple-600 text-white border-purple-600 shadow-2xs'
+                        : 'bg-purple-50 hover:bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800'
+                    }`}
+                    title={copilotOpen ? 'Minimize AI Chat' : 'Open AI Chat'}
+                  >
+                    <Sparkles size={13} className={copilotOpen ? 'text-white' : 'text-purple-600'} />
+                    <span>AI Chat</span>
+                  </button>
+                )}
+
                 <div className="flex items-center bg-muted/70 p-0.5 rounded-lg border border-border text-xs">
                   <button
                     type="button"
@@ -336,6 +363,8 @@ export default function ArticleEditorDialog({
               currentFormat={format}
               currentBody={body}
               currentUser={currentUser}
+              isOpen={copilotOpen}
+              onToggleOpen={setCopilotOpen}
               canRevert={!!previousState}
               onRevert={() => {
                 if (previousState) {

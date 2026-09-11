@@ -38,6 +38,20 @@ export const COPILOT_ARTICLE_PRESETS = [
     buildPrompt: () =>
       'Add an Executive Summary section at the very top with key objectives, target audience, and bullet points of high-level takeaways or architectural impact.',
   },
+  {
+    id: 'polish',
+    label: '🔍 Polish & Proofread',
+    description: 'Enhance clarity, fix grammar, and improve technical precision',
+    buildPrompt: () =>
+      'Proofread and polish the article for high technical clarity, professional tone, active voice, and concise explanations without altering the technical facts or procedures.',
+  },
+  {
+    id: 'runbook',
+    label: '🚒 Add Runbook Steps',
+    description: 'Add emergency response, triage commands, and escalation procedures',
+    buildPrompt: () =>
+      'Add a dedicated Incident Response & Operational Runbook section with alert triggers, immediate triage CLI commands, escalation contacts, and step-by-step resolution workflows.',
+  },
 ];
 
 /**

@@ -231,3 +231,47 @@ test('provider failure maps to 502; not-configured maps to 503', async () => {
   assert.equal(res503.status, 503);
   await s2.close();
 });
+
+test('POST /api/copilot/article passes conversation history to LLM', async () => {
+  let capturedMessages: { role: string; content: string }[] = [];
+  const fake: AskLLM = async (_system, messages) => {
+    capturedMessages = messages;
+    return {
+      answer: 'Refined draft based on history',
+      draftArticle: {
+        name: 'GKE Hardening Guide',
+        body: '# GKE Hardening Guide\n\n- Enable Workload Identity\n- Disable basic auth',
+        format: 'markdown',
+        summary: 'Added security checklist based on previous discussion.',
+      },
+    };
+  };
+
+  const { base, close } = await makeServer({ askLLM: fake });
+  await createUser('eng@team.test', 'pw123456');
+  const { cookie } = await login(base, 'eng@team.test', 'pw123456');
+
+  const res = await fetch(
+    base + '/api/copilot/article',
+    authed(cookie, 'POST', {
+      prompt: 'Now add security recommendations',
+      name: 'GKE Hardening Guide',
+      history: [
+        { role: 'user', content: 'Draft initial GKE guide' },
+        { role: 'assistant', content: 'Here is the initial draft.' },
+      ],
+    }),
+  );
+
+  assert.equal(res.status, 200);
+  assert.equal(capturedMessages.length, 3);
+  assert.equal(capturedMessages[0].role, 'user');
+  assert.equal(capturedMessages[0].content, 'Draft initial GKE guide');
+  assert.equal(capturedMessages[1].role, 'assistant');
+  assert.equal(capturedMessages[1].content, 'Here is the initial draft.');
+  assert.equal(capturedMessages[2].role, 'user');
+  assert.match(capturedMessages[2].content, /Requested Action \/ Instruction: Now add security recommendations/);
+
+  await close();
+});
+
