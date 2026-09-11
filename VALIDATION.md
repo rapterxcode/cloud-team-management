@@ -270,3 +270,35 @@ User reported that the create/edit modal for Knowledge articles was too cramped 
 - `docker compose up -d --build caddy`: Container `cloud-team-management-caddy-1` successfully rebuilt and restarted.
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+
+---
+
+## AI Copilot Assistant & Smart Editor Bug Fixes & Resilience — 2026-09-11
+
+**Scope & Defects Resolved:**
+1. **Form State Reset Bug (Data Loss Prevention):**
+   - Fixed `useEffect` in `ArticleEditorDialog` which previously wiped article body and title on category/background state updates while the user was actively typing.
+   - Guarded initialization using `useRef` (`prevOpenRef` & `prevEditingIdRef`) so form state only resets when the dialog transitions from closed to open, or when switching edited articles.
+2. **Title Overwrite Prevention:**
+   - Fixed `onApply` to never overwrite an existing user title with default `"Draft Article"`. Only adopts proposed title if user's title is blank.
+3. **Preset Preconditions Validation:**
+   - Prevented "⚡ Draft from Title" from wasting API calls on empty titles by prompting the user to specify a title or prompt.
+   - Prevented modification actions ("Checklist", "Format Code", "Convert HTML", "Executive Summary") from running on empty article bodies.
+4. **Tool Calling Isolation:**
+   - Isolated `toolChoice: 'article'` for `/api/copilot/article` and `toolChoice: 'task'` for `/api/copilot` chat so Gemini never confuses task creation with article drafting.
+   - Safely handled `res.text` access in `@google/genai` when function calls are present.
+   - Stripped redundant markdown code block wrappers (````markdown ... ````) from generated responses.
+5. **Proposal Review Enhancements:**
+   - Added collapsible "Preview Proposed Content" in the proposal review card so engineers can inspect generated content before applying.
+   - Added "Append to Bottom" option alongside "Apply to Editor (Replace All)".
+   - Added automatic view switching to `Split` when applying or inserting from `Preview` mode.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **47/47 pass** (100% green).
+- `npm --prefix api test`: **51/51 pass** (100% green).
+- `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
+- `npm --prefix api run build`: Clean API compile (`tsc -p tsconfig.json` 0 errors).
+- `docker compose up -d --build`: Both `api` and `caddy` containers rebuilt and healthy.
+- Live endpoint check:
+  - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
+
