@@ -46,7 +46,11 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
 
     try {
       const snapshot = await buildSnapshot(prisma);
-      const rawResult = await askLLM(SYSTEM_PREFIX + snapshot, [...history, { role: 'user', content: question }]);
+      const rawResult = await askLLM(
+        SYSTEM_PREFIX + snapshot,
+        [...history, { role: 'user', content: question }],
+        { toolChoice: 'task' }
+      );
       const result = typeof rawResult === 'string' ? { answer: rawResult } : rawResult;
 
       let draftTask = result.draftTask;
@@ -153,7 +157,8 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
       const snapshot = await buildSnapshot(prisma);
       const rawResult = await askLLM(
         ARTICLE_SYSTEM_PREFIX + snapshot,
-        [{ role: 'user', content: userMessageContent }]
+        [{ role: 'user', content: userMessageContent }],
+        { toolChoice: 'article' }
       );
       const result = typeof rawResult === 'string' ? { answer: rawResult } : rawResult;
 
@@ -167,10 +172,17 @@ export function copilotRoutes(prisma: PrismaClient, askLLM: AskLLM = realAskLLM)
         };
       }
 
+      let cleanBody = draftArticle.body?.trim() || '';
+      const fenceRegex = format === 'html' ? /^```(?:html)?\s*\n([\s\S]*?)\n```$/i : /^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/i;
+      const fenceMatch = cleanBody.match(fenceRegex);
+      if (fenceMatch && fenceMatch[1]) {
+        cleanBody = fenceMatch[1].trim();
+      }
+
       res.json({
         draftArticle: {
           name: draftArticle.name?.trim() || name || 'Draft Article',
-          body: draftArticle.body?.trim() || '',
+          body: cleanBody,
           format: draftArticle.format === 'html' ? 'html' : 'markdown',
           summary: draftArticle.summary?.trim() || result.answer || 'Draft prepared by Copilot',
         },

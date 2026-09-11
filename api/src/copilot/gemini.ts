@@ -28,7 +28,11 @@ export type CopilotResult = {
   draftArticle?: ArticleDraft;
 };
 
-export type AskLLM = (system: string, messages: ChatMessage[]) => Promise<CopilotResult | string>;
+export type AskLLM = (
+  system: string,
+  messages: ChatMessage[],
+  opts?: { toolChoice?: 'task' | 'article' | 'all' }
+) => Promise<CopilotResult | string>;
 
 export class CopilotNotConfiguredError extends Error {
   constructor() {
@@ -78,7 +82,7 @@ const draftArticleTool: FunctionDeclaration = {
   },
 };
 
-export const realAskLLM: AskLLM = async (system, messages) => {
+export const realAskLLM: AskLLM = async (system, messages, opts = {}) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new CopilotNotConfiguredError();
   const ai = new GoogleGenAI({ apiKey });
@@ -87,12 +91,22 @@ export const realAskLLM: AskLLM = async (system, messages) => {
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
   }));
+
+  const toolChoice = opts.toolChoice || 'all';
+  const tools: FunctionDeclaration[] = [];
+  if (toolChoice === 'task' || toolChoice === 'all') {
+    tools.push(draftTaskTool);
+  }
+  if (toolChoice === 'article' || toolChoice === 'all') {
+    tools.push(draftArticleTool);
+  }
+
   const res = await ai.models.generateContent({
     model: MODEL(),
     contents,
     config: {
       systemInstruction: system,
-      tools: [{ functionDeclarations: [draftTaskTool, draftArticleTool] }],
+      tools: tools.length > 0 ? [{ functionDeclarations: tools }] : undefined,
     },
   });
 
@@ -105,7 +119,15 @@ export const realAskLLM: AskLLM = async (system, messages) => {
     draftArticle = fnCall.args as ArticleDraft;
   }
 
-  let answer = res.text || '';
+  let answer = '';
+  if (!fnCall) {
+    try {
+      answer = res.text || '';
+    } catch {
+      answer = '';
+    }
+  }
+
   if (!answer && draftTask) {
     answer = `I've prepared a draft for "${draftTask.name}". Please review and confirm below.`;
   } else if (!answer && draftArticle) {

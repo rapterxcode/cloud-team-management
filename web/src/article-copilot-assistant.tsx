@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, Loader2, Check, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Sparkles, Loader2, Check, RotateCcw, ChevronDown, ChevronUp, Eye, PlusCircle } from 'lucide-react';
 import { post } from '@/lib/api';
 import { COPILOT_ARTICLE_PRESETS, buildArticleCopilotPrompt } from './lib/copilot-article.mjs';
 
@@ -16,7 +16,7 @@ export interface ArticleCopilotAssistantProps {
   currentFormat: 'markdown' | 'html';
   currentBody: string;
   currentUser?: { role?: string } | null;
-  onApply: (draft: ArticleDraftProposal) => void;
+  onApply: (draft: ArticleDraftProposal, mode?: 'replace' | 'append') => void;
   onRevert?: () => void;
   canRevert?: boolean;
 }
@@ -41,12 +41,13 @@ export function ArticleCopilotAssistant({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [proposal, setProposal] = useState<ArticleDraftProposal | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const [lastAppliedSummary, setLastAppliedSummary] = useState<string | null>(null);
 
   const handleRunCopilot = async (selectedPrompt: string) => {
     const activePrompt = (selectedPrompt || prompt).trim();
     if (!activePrompt) {
-      setError('Please select a preset or type an instruction.');
+      setError('Please select a quick action or type an instruction.');
       return;
     }
 
@@ -65,10 +66,10 @@ export function ArticleCopilotAssistant({
         currentBody: currentBody,
       });
 
-      if (res.draftArticle) {
+      if (res.draftArticle && res.draftArticle.body) {
         setProposal(res.draftArticle);
       } else {
-        setError('No draft generated. Please try a different prompt.');
+        setError('No draft content was returned. Please try a different prompt.');
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Could not generate draft.';
@@ -84,16 +85,18 @@ export function ArticleCopilotAssistant({
     }
   };
 
-  const handleApply = () => {
+  const handleApply = (mode: 'replace' | 'append' = 'replace') => {
     if (!proposal) return;
-    onApply(proposal);
-    setLastAppliedSummary(proposal.summary);
+    onApply(proposal, mode);
+    setLastAppliedSummary(`${mode === 'append' ? 'Appended' : 'Applied'}: ${proposal.summary}`);
     setProposal(null);
+    setShowPreview(false);
     setPrompt('');
   };
 
   const handleDiscard = () => {
     setProposal(null);
+    setShowPreview(false);
   };
 
   return (
@@ -144,6 +147,20 @@ export function ArticleCopilotAssistant({
                   type="button"
                   disabled={loading}
                   onClick={() => {
+                    // Precondition checks
+                    if (preset.id === 'draft' && !currentTitle.trim() && !prompt.trim()) {
+                      setError('Please enter an Article Title above (or type a topic in the prompt box) so Copilot knows what article to draft.');
+                      return;
+                    }
+                    if (
+                      ['checklist', 'format-code', 'convert-html', 'executive-summary'].includes(preset.id) &&
+                      !currentBody.trim() &&
+                      !prompt.trim()
+                    ) {
+                      setError(`Please enter or draft article content first before applying "${preset.label}".`);
+                      return;
+                    }
+
                     const promptText = buildArticleCopilotPrompt(preset.id, {
                       name: currentTitle,
                       category: currentCategory,
@@ -238,15 +255,43 @@ export function ArticleCopilotAssistant({
                 {proposal.summary}
               </p>
 
-              <div className="flex items-center gap-2 pt-1">
+              {/* Collapsible Content Preview */}
+              <div className="pt-0.5">
                 <button
                   type="button"
-                  onClick={handleApply}
+                  onClick={() => setShowPreview(!showPreview)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-purple-700 hover:text-purple-900"
+                >
+                  <Eye size={12} />
+                  <span>{showPreview ? 'Hide Proposed Content' : 'Preview Proposed Content'}</span>
+                </button>
+                {showPreview && (
+                  <div className="mt-1.5 p-2 rounded bg-slate-900 text-slate-100 font-mono text-[11px] max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed border border-slate-700">
+                    {proposal.body}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleApply('replace')}
                   className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white shadow-xs transition-colors"
                 >
                   <Check size={13} />
                   Apply to Editor
                 </button>
+                {currentBody.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => handleApply('append')}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors"
+                    title="Append proposed section to bottom of current article without replacing"
+                  >
+                    <PlusCircle size={13} />
+                    Append to Bottom
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleDiscard}

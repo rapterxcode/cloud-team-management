@@ -64,10 +64,18 @@ export default function ArticleEditorDialog({
   const [error, setError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const prevOpenRef = useRef(false);
+  const prevEditingIdRef = useRef<string | undefined>(undefined);
 
-  // Synchronize initial state when opened
+  // Synchronize initial state ONLY when dialog opens or editing article changes
   useEffect(() => {
-    if (open) {
+    const wasOpen = prevOpenRef.current;
+    prevOpenRef.current = open;
+    const currentId = editing?.id;
+    const editingChanged = prevEditingIdRef.current !== currentId;
+    prevEditingIdRef.current = currentId;
+
+    if (open && (!wasOpen || editingChanged)) {
       if (editing) {
         setName(editing.name || '');
         setCategory(editing.category || categories[0]?.name || 'Guides');
@@ -90,9 +98,12 @@ export default function ArticleEditorDialog({
         setViewMode('split');
       }
     }
-  }, [open, editing, categories]);
+  }, [open, editing]);
 
   const handleInsert = (prefix: string, suffix = '', defaultPlaceholder = '') => {
+    if (viewMode === 'preview') {
+      setViewMode('split');
+    }
     const ta = textareaRef.current;
     if (!ta) {
       setBody((prev) => prev + prefix + defaultPlaceholder + suffix);
@@ -141,6 +152,7 @@ export default function ArticleEditorDialog({
     if (parsed.name) setName(parsed.name);
     setBody(parsed.body);
     setFormat(parsed.format);
+    if (viewMode === 'preview') setViewMode('split');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -182,7 +194,7 @@ export default function ArticleEditorDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={`article-editor-dialog ${maximized ? 'is-maximized' : ''}`}>
-        <form onSubmit={handleSubmit} className="article-editor-container">
+        <form onSubmit={handleSubmit} noValidate className="article-editor-container">
           {/* Header Bar */}
           <DialogHeader className="article-editor-header">
             <div className="flex items-center justify-between gap-4 w-full pr-8">
@@ -333,11 +345,19 @@ export default function ArticleEditorDialog({
                   setPreviousState(null);
                 }
               }}
-              onApply={(draft) => {
+              onApply={(draft, mode = 'replace') => {
                 setPreviousState({ name, body, format });
-                if (draft.name) setName(draft.name);
-                setBody(draft.body);
+                // Only adopt draft title if user hasn't set their own custom title yet
+                if (draft.name && draft.name !== 'Draft Article' && !name.trim()) {
+                  setName(draft.name);
+                }
+                if (mode === 'append') {
+                  setBody((prev) => (prev ? prev.trimEnd() + '\n\n' + draft.body : draft.body));
+                } else {
+                  setBody(draft.body);
+                }
                 if (draft.format) setFormat(draft.format);
+                if (viewMode === 'preview') setViewMode('split');
               }}
             />
 
