@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bold, Italic, Code, List, ListOrdered, CheckSquare, Heading1, Heading2, Heading3, Table, AlertCircle, Quote, Upload, FileCode2, Palette, Sparkles } from 'lucide-react';
-import { parseImportedFile, CDN_CSS_PRESETS, getHtmlTemplateWithCdn } from './lib/toc.mjs';
+import { parseImportedFile, CDN_CSS_PRESETS, getHtmlTemplateWithCdn, CODE_LANGUAGES } from './lib/toc.mjs';
 
 type EditorToolbarProps = {
   format: 'markdown' | 'html';
@@ -16,6 +16,7 @@ export default function EditorToolbar({
   onImportDoc,
 }: EditorToolbarProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [codeLang, setCodeLang] = useState('bash');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -161,14 +162,32 @@ export default function EditorToolbar({
 
           <span className="toolbar-divider" />
 
-          <button
-            type="button"
-            className="tool-btn"
-            onClick={() => onInsert('```bash\n', '\n```', '# Command here')}
-            title="Code Block"
-          >
-            <FileCode2 size={14} />
-          </button>
+          <div className="flex items-center gap-0.5 border border-border/80 rounded bg-white dark:bg-slate-900 px-1 py-0.5 shadow-sm">
+            <button
+              type="button"
+              className="tool-btn text-purple-700 dark:text-purple-300"
+              onClick={() => onInsert(`\`\`\`${codeLang}\n`, '\n```', `// ${codeLang} code here`)}
+              title={`Insert ${codeLang} Code Block`}
+            >
+              <FileCode2 size={14} />
+            </button>
+            <select
+              aria-label="Code Block Language"
+              value={codeLang}
+              onChange={(e) => {
+                const lang = e.target.value;
+                setCodeLang(lang);
+                onInsert(`\`\`\`${lang}\n`, '\n```', `// ${lang} code here`);
+              }}
+              className="text-[11px] font-medium bg-transparent border-0 text-slate-700 dark:text-slate-300 cursor-pointer focus:outline-none pr-1"
+            >
+              {CODE_LANGUAGES.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             type="button"
             className="tool-btn"
@@ -268,6 +287,14 @@ export default function EditorToolbar({
             title="Insert interactive <button>"
           >
             &lt;button&gt;
+          </button>
+          <button
+            type="button"
+            className="tool-btn text-xs px-2"
+            onClick={() => onInsert('<pre><code>\n  ', '\n</code></pre>', '// Code block snippet')}
+            title="Insert <pre><code> block"
+          >
+            &lt;pre&gt;&lt;code&gt;
           </button>
         </div>
       )}

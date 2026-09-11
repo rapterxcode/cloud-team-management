@@ -197,3 +197,22 @@ export function getHtmlTemplateWithCdn(type = 'tailwind') {
 </body>
 </html>`;
 }
+
+export const CODE_LANGUAGES = [
+  { id: 'bash', name: 'Bash / Shell', ext: 'sh' },
+  { id: 'typescript', name: 'TypeScript', ext: 'ts' },
+  { id: 'javascript', name: 'JavaScript', ext: 'js' },
+  { id: 'json', name: 'JSON', ext: 'json' },
+  { id: 'yaml', name: 'YAML', ext: 'yaml' },
+  { id: 'sql', name: 'SQL', ext: 'sql' },
+  { id: 'python', name: 'Python', ext: 'py' },
+  { id: 'html', name: 'HTML', ext: 'html' },
+  { id: 'css', name: 'CSS', ext: 'css' },
+  { id: 'dockerfile', name: 'Dockerfile', ext: 'docker' },
+];
+
+export function createCodeBlock(code = '', language = 'bash') {
+  const lang = (language || '').toLowerCase().trim();
+  const content = code || (lang === 'bash' ? '# Run command\necho "Hello Cloud"' : '// Code snippet here');
+  return `\`\`\`${lang}\n${content}\n\`\`\`\n`;
+}

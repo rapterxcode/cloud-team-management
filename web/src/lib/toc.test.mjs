@@ -122,3 +122,28 @@ test('getHtmlTemplateWithCdn returns valid HTML skeletons with CDN resources', a
   const picoHtml = getHtmlTemplateWithCdn('pico');
   assert.match(picoHtml, /pico(\.min)?\.css/);
 });
+
+test('CODE_LANGUAGES provides supported syntax highlighting languages', async () => {
+  const { CODE_LANGUAGES } = await import('./toc.mjs');
+  assert.ok(Array.isArray(CODE_LANGUAGES));
+  assert.ok(CODE_LANGUAGES.some(l => l.id === 'bash'));
+  assert.ok(CODE_LANGUAGES.some(l => l.id === 'typescript'));
+  assert.ok(CODE_LANGUAGES.some(l => l.id === 'json'));
+  assert.ok(CODE_LANGUAGES.some(l => l.id === 'yaml'));
+  assert.ok(CODE_LANGUAGES.some(l => l.id === 'sql'));
+  assert.ok(CODE_LANGUAGES.some(l => l.id === 'python'));
+});
+
+test('createCodeBlock formats fenced code block with specified language and code', async () => {
+  const { createCodeBlock } = await import('./toc.mjs');
+
+  const tsBlock = createCodeBlock('const x: number = 42;', 'typescript');
+  assert.equal(tsBlock, '```typescript\nconst x: number = 42;\n```\n');
+
+  const emptyBashBlock = createCodeBlock('', 'bash');
+  assert.match(emptyBashBlock, /^```bash\n/);
+  assert.match(emptyBashBlock, /\n```\n$/);
+
+  const sqlBlock = createCodeBlock('SELECT * FROM users;', 'SQL');
+  assert.equal(sqlBlock, '```sql\nSELECT * FROM users;\n```\n');
+});

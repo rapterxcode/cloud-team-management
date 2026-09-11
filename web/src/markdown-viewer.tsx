@@ -9,6 +9,8 @@ function CodeBlock({ children, className }: { children?: React.ReactNode; classN
   const match = /language-(\w+)/.exec(className || '');
   const lang = match ? match[1] : '';
   const text = String(children ?? '').replace(/\n$/, '');
+  const lines = text.split('\n');
+  const showLineNumbers = lines.length > 1;
 
   const copy = async () => {
     try {
@@ -23,15 +25,31 @@ function CodeBlock({ children, className }: { children?: React.ReactNode; classN
   return (
     <div className="code-block-wrapper">
       <div className="code-block-header">
-        <span className="code-block-lang">{lang || 'snippet'}</span>
+        <div className="flex items-center gap-2">
+          <span className="code-block-lang">{lang || 'code'}</span>
+          {showLineNumbers && (
+            <span className="text-[10.5px] text-slate-400 font-mono font-normal">
+              {lines.length} lines
+            </span>
+          )}
+        </div>
         <button type="button" className="code-block-copy" onClick={copy} aria-label="Copy code">
           {copied ? <Check size={13} /> : <Copy size={13} />}
           <span>{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
-      <pre className="code-block-pre">
-        <code>{children}</code>
-      </pre>
+      <div className="code-block-body">
+        {showLineNumbers && (
+          <div className="code-line-numbers" aria-hidden="true">
+            {lines.map((_, i) => (
+              <span key={i} className="code-line-num">{i + 1}</span>
+            ))}
+          </div>
+        )}
+        <pre className="code-block-pre">
+          <code>{children}</code>
+        </pre>
+      </div>
     </div>
   );
 }
