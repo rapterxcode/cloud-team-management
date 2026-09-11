@@ -335,6 +335,36 @@ User reported: "bug ช่อง ai chat หายไป / AI Copilot Assistant 
 - `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
 - `npm --prefix api run build`: Clean API compile (`tsc -p tsconfig.json` 0 errors).
 - `docker compose up -d --build`: Stack rebuilt; `cloud-team-management-api-1` and `cloud-team-management-caddy-1` healthy.
+
+---
+
+## AI Copilot Smart Editor: Dedicated AI Chat Workspace & Height Expansion — 2026-09-11
+
+**Issue Addressed:**
+User reported: "ช่องแชท มันเล็กเกินไป" (The chat box is too small).
+
+**Root Cause Analysis:**
+1. **Chat Canvas Height Constrained:** On wide desktop screens (>=1440px), the textarea and viewport felt like narrow horizontal strips.
+2. **Scroll Space Competition:** In `split` or `write` modes, having the Markdown text editor (500px) directly below forced the user to scroll back and forth between drafting instructions and inspecting the editor.
+3. **Empty Chat Collapse:** When no messages were present, the conversation viewport had minimal height, making the component look squished.
+
+**Key Enhancements:**
+1. **Dedicated AI Chat Workspace Mode (`viewMode === 'ai-chat'`):**
+   - Added `🤖 AI Chat Workspace` button to the DialogHeader view switcher alongside `Write`, `Split View`, and `Preview`.
+   - In `ai-chat` mode, the editor hides the underlying markdown editor and expands the AI Copilot to take 100% full height of the modal dialog (`min-h-[620px] flex-1`).
+   - Chat thread viewport takes `flex-1 min-h-[380px]` with generous vertical space for reading long AI responses.
+   - Maximize/Minimize toggle button in the assistant header to easily pop in and out of the full workspace.
+   - Auto-transitions back to `Split View` upon applying or appending a draft so the user can immediately see the applied changes in the live editor and preview.
+2. **Substantial Textarea Height Expansion:**
+   - Default height increased to `rows={7}` and `min-h-[180px] md:min-h-[220px]` (resizable up to 480px via `resize-y`).
+   - Text size enlarged to `text-base` (16px) with generous padding for comfortable typing.
+3. **Permanent Welcome Viewport:**
+   - When messages are empty, renders a welcoming canvas with 3 actionable prompt suggestions so the thread area never looks collapsed or empty.
+
+**Verification Evidence:**
+- `npm --prefix web test`: **47/47 pass** (100% green).
+- `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
+- `docker compose up -d --build caddy`: Rebuilt Caddy container with fresh static bundle; container recreated and healthy.
 - Live endpoint check:
   - `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`
 
