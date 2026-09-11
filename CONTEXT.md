@@ -32,12 +32,21 @@ _Avoid_: Using "team" for anything other than the User roster — see Project de
 A User whose `is_active` flag is off: they cannot log in and don't appear in the Owner picker for new Tasks, but their User row is never deleted — Tasks they own keep their `owner_id` and history stays intact. Users are deactivated, never hard-deleted.
 _Avoid_: Deleting a user, removing a user (as an action name)
 
-**Role**:
-An access level flag on a User: `admin`, `member`, or `auditor`.
-- `admin`: Full administration, user creation/deactivation, and unrestricted CRUD.
-- `member`: Engineering team members with standard CRUD access across projects, tasks, knowledge, and document uploads.
-- `auditor`: Read-only compliance inspector role satisfying ISO 27001 (A.9) and Bank of Thailand (BOT) segregation of duties. Can view dashboards, projects, tasks, knowledge, and preview/download project documents, but cannot create, modify, or delete any entities.
-_Avoid_: Viewer, guest, read-only user
+**Global role**:
+A platform-wide access level flag on a User (`admin`, `member`, or `auditor`).
+- `admin`: Full platform administration, system user management, and unrestricted access.
+- `member`: Standard platform user access.
+- `auditor`: Global read-only compliance inspector role satisfying ISO 27001 and BOT segregation of duties.
+_Avoid_: Superuser, root
+
+**Workspace role**:
+A granular, per-workspace access level assigned to a Workspace member (`admin`, `lead`, `member`, `auditor`, or `viewer`).
+- `admin`: Full management of the workspace, including workspace settings, member invites, and role assignments (with last-admin guard).
+- `lead`: Leads projects, tasks, and day-to-day operations within the workspace.
+- `member`: Standard contributor creating and editing tasks, projects, and articles in the workspace.
+- `auditor`: Read-only compliance inspector role strictly barred from mutations.
+- `viewer`: Read-only observer.
+_Avoid_: Member role, tenant permission
 
 **Project department**:
 A free-text label on a Project naming which department/squad owns it (e.g. "Platform", "Engineering", "DevOps"). Stored as `Project.department`, not `Project.team` — the old field name collided with the Team (User roster) concept above. Display copy may still say "Team" in the UI; the rename is schema/code only.
@@ -109,3 +118,20 @@ _Avoid_: Auth log, signin record, login history
 **Audit log**:
 An append-only, immutable transaction record capturing all business entity mutations (CREATE, UPDATE, DELETE, ROLE_CHANGE) across Projects, Tasks, Documents, and Articles, storing the actor identity, action type, and JSON payload diff.
 _Avoid_: Activity log, change log, history table
+
+**Workspace team type**:
+The specialized operational domain or discipline of a Workspace (`engineering`, `infrastructure`, `security`, `governance`, `qa`, `operations`, `custom`), displayed with color-coded badges in the workspace switcher.
+_Avoid_: Workspace category, team tag
+
+**User profile**:
+A self-service user management modal (`<div className="profile">`) allowing the authenticated User to update their display name, title/department, securely change password (with Argon2id hashing and verification), and view their last 5 login sessions.
+_Avoid_: Account settings, user admin
+
+**Local attachment storage**:
+The persistent local directory (`./attachments`) on the host machine bind-mounted into `/attachments` in the container stack, ensuring compliance documents and uploaded files persist across container lifecycles without requiring external cloud object storage.
+_Avoid_: Container volume, temp upload folder
+
+**Copilot multimodal attachment**:
+An uploaded file (image, PDF, Word, Excel, PowerPoint, Outlook `.msg`/`.eml`, code, log, or text) parsed and grounded directly into Gemini 3.8 Flash prompts for deep context reasoning, document analysis, and task/runbook generation.
+_Avoid_: Chat upload, copilot file
+

@@ -24,7 +24,8 @@ This document defines the **AI Multi-Agent Engineering Lifecycle (AI SDLC Engine
 │                   │ • Enforces quality gates and adjudicates code reviews.  │
 ├───────────────────┼─────────────────────────────────────────────────────────┤
 │ Specialist Agents │ • Backend Engineer: Prisma, Express APIs, auth & guards. │
-│ (Responsible)     │ • Frontend Logic: Pure client calculations & unit tests.│
+│ (Responsible)     │ • AI Engineer: Gemini 3.8 Flash, snapshot, doc parser.  │
+│                   │ • Frontend Logic: Pure client calculations & unit tests.│
 │                   │ • Frontend UI: React 19 SPA, Tailwind components, modals│
 │                   │ • Test & Security Auditor: Quality gates & compliance.  │
 └───────────────────┴─────────────────────────────────────────────────────────┘
@@ -100,3 +101,31 @@ flowchart TD
 2. **Ponytail Simplicity:** Prefer the simplest design that satisfies requirements. Reject speculative abstractions, redundant frameworks, and premature optimizations.
 3. **Evidence over assertion:** Never declare completion without automated test logs, build status, and container health evidence.
 4. **Protect evidence & secrets:** Never commit credentials, `.env` secrets, or tokens. Ensure audit evidence is immutable and protected by role-based guards.
+
+---
+
+## 4. System Architecture & Operational Constraints
+
+- **Application Stack:** React 19 SPA (Vite + Tailwind CSS), Node.js Express API (TypeScript + Prisma ORM), PostgreSQL 17, and Caddy 2 reverse proxy with automatic TLS.
+- **Multi-Workspace & RBAC:**
+  - Entity tenancy is scoped by `workspaceId` (Projects, Tasks, Knowledge Articles).
+  - 5 per-workspace roles: `admin`, `lead`, `member`, `auditor`, `viewer`.
+  - Enforce Segregation of Duties (SoD) under ISO 27001 (A.9) and Bank of Thailand (BOT) IT Governance. `auditor` and `viewer` roles are strictly blocked from write/update/delete mutations.
+  - Guard against deleting the default workspace or demoting/deactivating the last active administrator.
+- **Audit & Access Trail Immutability:**
+  - `AccessLog`: Tracks all authentication outcomes (`login_success`, `login_failed`, `logout`) with client IP address and user-agent string.
+  - `AuditLog`: Tracks all entity mutations (create, update, delete, upload, assign) with `beforeJson` and `afterJson` state diffs.
+  - *Zero mutation rule:* No `DELETE` or `UPDATE` endpoints may ever be created for log tables.
+- **Local Attachment Storage:**
+  - Uploaded compliance evidence, runbook attachments, and Copilot files MUST be stored in the host directory `./attachments`, bind-mounted to `/attachments` in the container stack.
+  - Container-ephemeral storage for uploaded files is strictly prohibited.
+- **AI Copilot (Gemini 3.8 Flash):**
+  - Uses `@google/genai` with model `gemini-3.8-flash`.
+  - Snapshot budget up to 1,000,000 characters capturing full live workspace facts, runbooks, compliance checkpoints, and tasks.
+  - Multimodal parsing pipeline handles Images, PDF, MS Office (`.xlsx`, `.docx`, `.pptx`), Outlook (`.msg`, `.eml`), and structured text/logs.
+- **Verification Commands:**
+  - API Integration Tests: `DATABASE_URL=postgresql://postgres:...@localhost:5432/ctm_test npm --prefix api test`
+  - Web Unit Tests: `npm --prefix web test`
+  - TypeScript & Production Build: `npm --prefix api run build && npm --prefix web run build`
+  - Container Verification: `docker compose up -d --build && curl -sk https://localhost/api/health`
+
