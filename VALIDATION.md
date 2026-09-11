@@ -138,4 +138,35 @@ Branch `feat/iso27001-bot-compliance-management`. IT Governance and Audit Readin
   - `cloud-team-management-backup-1`: Up
 - Live Endpoints: `https://localhost/api/health` returns HTTP/2 200 `{"ok":true}`.
 
+---
+
+## Gantt Interactive Drag-and-Drop & Expand-All Fix — 2026-09-11
+
+**Scope:**
+1. Fix Gantt Expand-all display bug where tasks below the viewport were clipped and hidden.
+2. Phase summary bar timeline drag-and-drop: moving the summary bar shifts all tasks in that phase and updates start/date.
+3. Task-to-phase drag-and-drop: dragging a task row into another phase updates its phase and synchronizes its timeline proportionally.
+4. Phase reordering via header drag-and-drop.
+
+**Key Changes:**
+- `web/src/project-gantt.tsx`:
+  - Replaced Base UI `<ScrollArea>` with high-performance native `<div className="gantt-scroll">` (`max-height: 720px; overflow: auto;`) allowing complete vertical and horizontal scrolling across all expanded phases with sticky column support (`.sticky-cell`).
+  - Added `normalizePhase` and expanded `defaultPhases` (`Planning`, `Development`, `Testing`, `Launch`, `Audit`).
+  - Implemented `startPhaseDrag` on summary bars with real-time multi-task preview and batch `onUpdate`.
+  - Implemented HTML5 draggable on task rows and drop targets on phase headers and tracks (`handleMoveTaskToPhase`), shifting timeline dates automatically into the target phase.
+  - Implemented phase reordering (`handleReorderPhase`).
+- `web/src/lib/gantt.mjs`:
+  - Exported `shiftPhaseTasks(phaseTasks, deltaDays)`, `normalizePhase(phase)`, `reorderPhases(list, source, target)`, and `moveTaskToPhaseWithTimeline(task, targetPhase, allTasks)`.
+  - Resilient `schedule()` with date validation error boundaries.
+- `web/src/lib/gantt.test.mjs`:
+  - Added unit tests for `normalizePhase`, `reorderPhases`, `moveTaskToPhaseWithTimeline`, and `shiftPhaseTasks`.
+- `web/src/globals.css`:
+  - Added styles for `.phase-track.drop-target-track`, `.gantt-phase.drop-target`, and `.gantt-bar.summary.is-dragging`.
+
+**Verification:**
+- `npm --prefix web test`: **31/31 pass** (100% green).
+- `npm --prefix web run build`: Clean production compile (`tsc --noEmit` 0 errors, `vite build` 0 errors).
+- `npm --prefix api run build`: Clean API compile (`tsc -p tsconfig.json` 0 errors).
+- `docker compose up -d --build caddy`: Live container recreation and health check passed (`curl -sk https://localhost/api/health` -> `{"ok":true}`).
+
 

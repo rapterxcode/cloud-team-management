@@ -15,7 +15,7 @@ test('seed creates deactivated demo users, demo data, and an env admin; runs twi
   const demo = await prisma.user.findMany({ where: { email: { endsWith: '@demo.local' } } });
   assert.equal(demo.length, 4);
   assert.ok(demo.every((u) => !u.isActive));
-  assert.equal(await prisma.project.count(), 3);
+  assert.equal(await prisma.project.count(), 5);
   assert.equal(await prisma.task.count(), 4);
   assert.equal(await prisma.knowledgeArticle.count(), 4);
   assert.equal(await prisma.cloudResource.count(), 4);
