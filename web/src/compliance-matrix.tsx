@@ -12,6 +12,7 @@ interface ComplianceMatrixProps {
   projects: Array<{ id: string; name: string; department: string; status: string }>;
   onSelectProject?: (projectId: string, tab?: string) => void;
   currentUser: { id: string; role: string; name: string };
+  activeWorkspaceId?: string;
 }
 
 interface MatrixData {
@@ -25,7 +26,7 @@ interface MatrixData {
   readinessScore: number;
 }
 
-export function ComplianceMatrix({ projects, onSelectProject, currentUser }: ComplianceMatrixProps) {
+export function ComplianceMatrix({ projects, onSelectProject, currentUser, activeWorkspaceId }: ComplianceMatrixProps) {
   const [matrix, setMatrix] = useState<Record<string, MatrixData>>({});
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
@@ -33,7 +34,8 @@ export function ComplianceMatrix({ projects, onSelectProject, currentUser }: Com
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/compliance/matrix')
+    const wsQuery = activeWorkspaceId ? `?workspaceId=${encodeURIComponent(activeWorkspaceId)}` : '';
+    fetch(`/api/compliance/matrix${wsQuery}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (cancelled) return;
@@ -103,7 +105,7 @@ export function ComplianceMatrix({ projects, onSelectProject, currentUser }: Com
         setMatrix(newMatrix);
       });
     return () => { cancelled = true; };
-  }, [projects]);
+  }, [projects, activeWorkspaceId]);
 
   const departments = useMemo(() => Array.from(new Set(projects.map(p => p.department))), [projects]);
 

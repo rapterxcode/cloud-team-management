@@ -1,165 +1,977 @@
-import {useState,useEffect,useRef} from 'react';
-import {Cloud,LayoutDashboard,FolderKanban,ListTodo,Users,Server,ChartNoAxesCombined,ArrowUpRight,ArrowRight,Plus,Search,Check,Activity,ChevronDown,Clock,Layers,BookOpen,FileText,Pencil,Shield,LogOut,Sparkles,ShieldCheck,ShieldAlert,Upload,History} from 'lucide-react';
-import {SidebarProvider,Sidebar,SidebarHeader,SidebarContent,SidebarFooter,SidebarMenu,SidebarMenuItem,SidebarMenuButton,SidebarTrigger} from '@/components/ui/sidebar';
-import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
-import {NativeSelect,NativeSelectOption} from '@/components/ui/native-select';
-import ProjectGantt from './project-gantt';
-import {Progress} from '@/components/ui/progress';
-import {Table,TableHeader,TableBody,TableRow,TableHead,TableCell} from '@/components/ui/table';
-import {filterItems,projectTasks,computeWorkload} from '@/lib/workspace.mjs';
-import {api,post,patch,destroy} from '@/lib/api';
-import {withDue,type Me,type User,type Project,type Task,type ApiTask,type Article,type Resource,type KnowledgeCategory,type Workspace} from '@/lib/types';
-import {filterArticles,highlightMatches,snippetWithMatch} from '@/lib/search.mjs';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
+import {
+  BookOpen,
+  ChartNoAxesCombined,
+  Cloud,
+  FolderKanban,
+  History,
+  LayoutDashboard,
+  ListTodo,
+  LogOut,
+  Plus,
+  Server,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+  Users,
+} from 'lucide-react';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+} from '@/components/ui/sidebar';
+import {
+  computeWorkload,
+  filterItems,
+  projectTasks,
+} from '@/lib/workspace.mjs';
+import { api, destroy, patch, post } from '@/lib/api';
+import {
+  withDue,
+  type ApiTask,
+  type Article,
+  type KnowledgeCategory,
+  type Me,
+  type Project,
+  type Resource,
+  type Task,
+  type User,
+  type Workspace,
+} from '@/lib/types';
+import { filterArticles } from '@/lib/search.mjs';
 import Login from './login';
-import AdminPanel from './admin';
-import ArticleAttachments from './attachments';
-import CopilotPanel from './copilot';
-import TaskDrawer from './task-drawer';
-import MarkdownViewer from './markdown-viewer';
-import ProjectDocuments from './project-documents';
-import { ComplianceMatrix } from './compliance-matrix';
-import ArticleReaderDialog from './article-reader-dialog';
-import CategoryManagerDialog from './category-manager-dialog';
-import ArticleEditorDialog from './article-editor-dialog';
 import WorkspaceSwitcher from './workspace-switcher';
-import UserProfileDialog from './user-profile-dialog';
-import LogsViewer from './logs-viewer';
-const nav=[['Overview',LayoutDashboard],['Projects',FolderKanban],['Tasks',ListTodo],['Knowledge',BookOpen],['Compliance and Governance',ShieldCheck],['Team',Users],['Cloud resources',Server],['Reports',ChartNoAxesCombined]] as const;
-const initials=(name:string)=>name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-export default function Home(){
- const [me,setMe]=useState<Me|null|undefined>(undefined);
- const [users,setUsers]=useState<User[]>([]);
- const [workspaces,setWorkspaces]=useState<Workspace[]>([]);
- const [activeWorkspace,setActiveWorkspace]=useState<Workspace|null>(null);
- const [profileDialogOpen,setProfileDialogOpen]=useState(false);
- const [view,setView]=useState('Overview'),[projects,setProjects]=useState<Project[]>([]),[tasks,setTasks]=useState<Task[]>([]),[query,setQuery]=useState(''),[filter,setFilter]=useState('All'),[yearFilter,setYearFilter]=useState('All'),[modal,setModal]=useState(''),[detail,setDetail]=useState<Project|null>(null),[notice,setNotice]=useState('');
- const [projectTab,setProjectTab]=useState<'tasks'|'documents'>('tasks');
- const [projectDocuments,setProjectDocuments]=useState<any[]>([]);
- const [formError,setFormError]=useState('');
- const [copilotOpen,setCopilotOpen]=useState(false);
- const [copilotInitialPrompt,setCopilotInitialPrompt]=useState('');
- const [selectedTask,setSelectedTask]=useState<Task|null>(null);
- const [knowledge,setKnowledge]=useState<Article[]>([]),[article,setArticle]=useState<Article|null>(null),[editing,setEditing]=useState<Article|null>(null);
- const [categories,setCategories]=useState<KnowledgeCategory[]>([]);
- const [categoryManagerOpen,setCategoryManagerOpen]=useState<boolean>(false);
- const [articleEditorOpen,setArticleEditorOpen]=useState<boolean>(false);
- const [editingArticle,setEditingArticle]=useState<Article|null>(null);
- const [resourceRows,setResourceRows]=useState<Resource[]>([]);
- const [editingProject,setEditingProject]=useState<Project|null>(null),[editingResource,setEditingResource]=useState<Resource|null>(null);
- const loadAll=async(wsId?:string)=>{
-   const targetWsId=wsId!==undefined?wsId:(activeWorkspace?.id||'');
-   const wsParam=targetWsId?`?workspaceId=${encodeURIComponent(targetWsId)}`:'';
-   const [p,t,k,r,u,docs,cats,wsList]=await Promise.all([
-     api<Project[]>(`/projects${wsParam}`),
-     api<ApiTask[]>(`/tasks${wsParam}`),
-     api<Article[]>(`/knowledge${wsParam}`),
-     api<Resource[]>('/resources'),
-     api<User[]>('/users'),
-     api<any[]>('/project-documents').catch(()=>[]),
-     api<KnowledgeCategory[]>('/knowledge/categories').catch(()=>[]),
-     api<Workspace[]>('/workspaces').catch(()=>[])
-   ]);
-   setProjects(p);setTasks(t.map(withDue));setKnowledge(k);setResourceRows(r);setUsers(u);setProjectDocuments(docs);setCategories(cats);
-   if(wsList.length>0){
-     setWorkspaces(wsList);
-     if(!activeWorkspace&&!wsId){
-       setActiveWorkspace(wsList[0]);
-     }
-   }
- };
- useEffect(()=>{api<Me>('/auth/me').then(m=>{setMe(m);return loadAll();}).catch(()=>setMe(null));},[]);
- const navigate=(name:string)=>{setView(name);setQuery('');setFilter('All');setYearFilter('All');};
- useEffect(()=>{
- const context=(document as Document & {modelContext?:{registerTool:(tool:unknown,options:{signal:AbortSignal})=>unknown}}).modelContext;
- if(!context?.registerTool)return;
- const lifecycle=new AbortController();
- try{Promise.resolve(context.registerTool({name:'navigate_workspace',description:'Open a Cloud Team workspace view. Does not create or change records.',inputSchema:{type:'object',properties:{view:{type:'string',enum:nav.map(([name])=>name)}},required:['view'],additionalProperties:false},annotations:{readOnlyHint:false},execute:(input:unknown)=>{
- if(!input||typeof input!=='object'||!('view' in input)||!nav.some(([name])=>name===(input as {view:unknown}).view))throw new Error('Choose a supported workspace view');
- const target=(input as {view:string}).view;
- setView(target);setQuery('');setFilter('All');return {requestedView:target};
- }},{signal:lifecycle.signal})).catch(()=>{});}catch{}
- return ()=>lifecycle.abort();
- },[]);
- const create=async(event:React.SyntheticEvent<HTMLFormElement>)=>{
- event.preventDefault();const data=new FormData(event.currentTarget);const name=(data.get('name') as string || '').trim();if(!name)return;
- try{
- if(modal==='project'){
- const year=Number(data.get('year'))||2026;const status=(data.get('status') as string)||(editingProject?editingProject.status:'New');
- if(editingProject){const body={name,description:data.get('description') as string,status,year,progress:Number(data.get('progress')),department:data.get('department') as string,due:data.get('due') as string};const p=await patch<Project>(`/projects/${editingProject.id}`,body);setProjects(projects.map(x=>x.id===p.id?p:x));if(detail?.id===p.id)setDetail(p);setEditingProject(null);}
- else{const p=await post<Project>('/projects',{name,description:(data.get('description') as string || 'Ready to get started.'),year,status,due:(data.get('due') as string)||undefined});setProjects([...projects,p]);}
- }else if(modal==='resource'){
- const body={name,provider:data.get('provider') as string,type:data.get('type') as string,status:data.get('status') as string,monthlyCost:Number(data.get('monthlyCost'))};
- if(editingResource){const r=await patch<Resource>(`/resources/${editingResource.id}`,body);setResourceRows(resourceRows.map(x=>x.id===r.id?r:x));}
- else{const r=await post<Resource>('/resources',body);setResourceRows([...resourceRows,r]);}
- setEditingResource(null);
-   }else{const t=await post<ApiTask>('/tasks',{name,description:data.get('description') as string || '',projectId:data.get('projectId') as string,ownerId:data.get('ownerId') as string,phase:data.get('phase') as string,start:data.get('start') as string,date:data.get('date') as string});setTasks([...tasks,withDue(t)]);}
- setNotice('Saved.');setModal('');setFormError('');
- }catch(e){setFormError(e instanceof Error?e.message:'Something went wrong.');}
- };
- const finishTask=async(id:string)=>{try{setTasks(prev=>prev.map(t=>t.id===id?{...t,status:'Done'}:t));if(selectedTask?.id===id)setSelectedTask(prev=>prev?{...prev,status:'Done'}:null);const t=await patch<ApiTask>(`/tasks/${id}`,{status:'Done'});setTasks(prev=>prev.map(x=>x.id===id?withDue(t):x));if(selectedTask?.id===id)setSelectedTask(withDue(t));}catch(e){await loadAll();setNotice(e instanceof Error?e.message:'Could not update task.');}};
- const editTask=async(id:string,changes:Record<string,unknown>)=>{const updatedOwner=changes.ownerId?users.find(u=>u.id===changes.ownerId):undefined;setTasks(prev=>prev.map(t=>{if(t.id!==id)return t;return {...t,...changes,start:changes.start!==undefined?(changes.start as string):t.start,date:changes.date!==undefined?(changes.date as string):t.date,due:changes.date!==undefined?((changes.date as string)||'Not set'):t.due,ownerName:updatedOwner?updatedOwner.name:t.ownerName};}));if(selectedTask?.id===id){setSelectedTask(prev=>prev?{...prev,...changes,start:changes.start!==undefined?(changes.start as string):prev.start,date:changes.date!==undefined?(changes.date as string):prev.date,due:changes.date!==undefined?((changes.date as string)||'Not set'):prev.due,ownerName:updatedOwner?updatedOwner.name:prev.ownerName}:null);}try{const t=await patch<ApiTask>(`/tasks/${id}`,changes);setTasks(prev=>prev.map(x=>x.id===id?withDue(t):x));if(selectedTask?.id===id){setSelectedTask(withDue(t));}}catch(e){await loadAll();throw e;}};
- const removeTask=async(id:string)=>{try{await destroy(`/tasks/${id}`);setTasks(tasks.filter(t=>t.id!==id));}catch(e){setNotice(e instanceof Error?e.message:'Could not delete task.');}};
- const removeProject=async(id:string)=>{if(!confirm('Delete this project and all its tasks?'))return;try{await destroy(`/projects/${id}`);setProjects(projects.filter(p=>p.id!==id));setTasks(tasks.filter(t=>t.projectId!==id));navigate('Projects');}catch(e){setNotice(e instanceof Error?e.message:'Could not delete project.');}};
- const removeResource=async(id:string)=>{if(!confirm('Delete this resource?'))return;try{await destroy(`/resources/${id}`);setResourceRows(resourceRows.filter(r=>r.id!==id));}catch(e){setNotice(e instanceof Error?e.message:'Could not delete resource.');}};
- const removeArticle=async(id:string)=>{if(!confirm('Delete this article?'))return;try{await destroy(`/knowledge/${id}`);setKnowledge(knowledge.filter(k=>k.id!==id));setArticle(null);}catch(e){setNotice(e instanceof Error?e.message:'Could not delete article.');}};
- const logout=async()=>{await post('/auth/logout',{});setMe(null);};
- if(me===undefined)return <div className="app-loading">Loading…</div>;
- if(me===null)return <Login onLogin={m=>{setMe(m);loadAll();}}/>;
- const members=users.map(u=>[u.name,u.title,initials(u.name),computeWorkload(tasks,u.id)] as const);
- const activeUsers=users.filter(u=>u.isActive);
- const navItems=me.role==='admin'?[...nav,['Admin',Shield] as const,['Logs & Audit',History] as const]:me.role==='auditor'?[...nav,['Logs & Audit',History] as const]:nav;
- const selectedTasks=detail?projectTasks(tasks,detail.id) as Task[]:[];
- const visibleKnowledge=filterArticles(knowledge,query,filter);
- const visibleProjects=filterItems(projects,query,filter,yearFilter) as Project[],visibleTasks=filterItems(tasks,query,filter) as Task[];
- const totalMonthly=resourceRows.reduce((sum,r)=>sum+r.monthlyCost,0);
- const spendByProvider=Object.entries(resourceRows.reduce<Record<string,number>>((acc,r)=>{acc[r.provider]=(acc[r.provider]||0)+r.monthlyCost;return acc;},{}));
-  const openCreate=()=>{
-    if(view==='Knowledge'){
+import { OverviewView } from './views/overview-view';
+import { ProjectsView, ProjectWorkspaceView } from './views/projects-view';
+import { TasksKanbanView } from './views/tasks-kanban-view';
+import { TeamView } from './views/team-view';
+import { CloudResourcesView } from './views/cloud-resources-view';
+import { ReportsView } from './views/reports-view';
+import { KnowledgeView } from './views/knowledge-view';
+import { EntityFormDialog } from './views/entity-form-dialog';
+
+const AdminPanel = lazy(() => import('./admin'));
+const CopilotPanel = lazy(() => import('./copilot'));
+const TaskDrawer = lazy(() => import('./task-drawer'));
+const ComplianceMatrix = lazy(() =>
+  import('./compliance-matrix').then((m) => ({ default: m.ComplianceMatrix }))
+);
+const ArticleReaderDialog = lazy(() => import('./article-reader-dialog'));
+const CategoryManagerDialog = lazy(() => import('./category-manager-dialog'));
+const ArticleEditorDialog = lazy(() => import('./article-editor-dialog'));
+const UserProfileDialog = lazy(() => import('./user-profile-dialog'));
+const LogsViewer = lazy(() => import('./logs-viewer'));
+
+const nav = [
+  ['Overview', LayoutDashboard],
+  ['Projects', FolderKanban],
+  ['Tasks', ListTodo],
+  ['Knowledge', BookOpen],
+  ['Compliance and Governance', ShieldCheck],
+  ['Team', Users],
+  ['Cloud resources', Server],
+  ['Reports', ChartNoAxesCombined],
+] as const;
+
+const initials = (name: string) =>
+  name
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+const VIEW_DESCRIPTIONS: Record<string, string> = {
+  Overview: 'A little clarity for everything your team is building.',
+  Projects: 'Keep every initiative moving in the right direction.',
+  Tasks: 'Turn today’s priorities into progress.',
+  Team: 'The people behind your cloud.',
+  Knowledge: 'Shared knowledge. Fewer repeat questions.',
+  'Project workspace':
+    'Tasks, owners and the timeline — together in one place.',
+  'Compliance and Governance':
+    'Central oversight of ISO 27001 & Bank of Thailand (BOT) audit readiness and IT governance.',
+  Reports: 'A closer look at your team and infrastructure.',
+  'Cloud resources':
+    'Multi-cloud infrastructure asset inventory and FinOps governance.',
+  Admin: 'Manage who can access this workspace.',
+  'Logs & Audit':
+    'Inspect immutable transaction audit trail, authentication attempts, and regulatory compliance logs.',
+};
+
+export default function Home() {
+  const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [users, setUsers] = useState<User[]>([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+
+  const [view, setView] = useState('Overview');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('All');
+  const [yearFilter, setYearFilter] = useState('All');
+  const [modal, setModal] = useState('');
+  const [detail, setDetail] = useState<Project | null>(null);
+  const [notice, setNotice] = useState('');
+
+  const [projectTab, setProjectTab] = useState<'tasks' | 'documents'>('tasks');
+  const [projectDocuments, setProjectDocuments] = useState<any[]>([]);
+  const [formError, setFormError] = useState('');
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [copilotInitialPrompt, setCopilotInitialPrompt] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const [knowledge, setKnowledge] = useState<Article[]>([]);
+  const [article, setArticle] = useState<Article | null>(null);
+  const [categories, setCategories] = useState<KnowledgeCategory[]>([]);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [articleEditorOpen, setArticleEditorOpen] = useState(false);
+  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+
+  const [resourceRows, setResourceRows] = useState<Resource[]>([]);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [editingResource, setEditingResource] = useState<Resource | null>(null);
+
+  const loadAll = async (wsId?: string) => {
+    const targetWsId = wsId !== undefined ? wsId : activeWorkspace?.id || '';
+    const wsParam = targetWsId
+      ? `?workspaceId=${encodeURIComponent(targetWsId)}`
+      : '';
+    const [p, t, k, r, u, docs, cats, wsList] = await Promise.all([
+      api<Project[]>(`/projects${wsParam}`),
+      api<ApiTask[]>(`/tasks${wsParam}`),
+      api<Article[]>(`/knowledge${wsParam}`),
+      api<Resource[]>('/resources'),
+      api<User[]>('/users'),
+      api<any[]>('/project-documents').catch(() => []),
+      api<KnowledgeCategory[]>('/knowledge/categories').catch(() => []),
+      api<Workspace[]>('/workspaces').catch(() => []),
+    ]);
+    setProjects(p);
+    setTasks(t.map(withDue));
+    setKnowledge(k);
+    setResourceRows(r);
+    setUsers(u);
+    setProjectDocuments(docs);
+    setCategories(cats);
+    if (wsList.length > 0) {
+      setWorkspaces(wsList);
+      if (!activeWorkspace && !wsId) {
+        setActiveWorkspace(wsList[0]);
+      }
+    }
+  };
+
+  useEffect(() => {
+    api<Me>('/auth/me')
+      .then((m) => {
+        setMe(m);
+        return loadAll();
+      })
+      .catch(() => setMe(null));
+  }, []);
+
+  const navigate = (name: string) => {
+    setView(name);
+    setQuery('');
+    setFilter('All');
+    setYearFilter('All');
+  };
+
+  useEffect(() => {
+    const context = (
+      document as Document & {
+        modelContext?: {
+          registerTool: (
+            tool: unknown,
+            options: { signal: AbortSignal }
+          ) => unknown;
+        };
+      }
+    ).modelContext;
+    if (!context?.registerTool) return;
+    const lifecycle = new AbortController();
+    try {
+      Promise.resolve(
+        context.registerTool(
+          {
+            name: 'navigate_workspace',
+            description:
+              'Open a Cloud Team workspace view. Does not create or change records.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                view: { type: 'string', enum: nav.map(([name]) => name) },
+              },
+              required: ['view'],
+              additionalProperties: false,
+            },
+            annotations: { readOnlyHint: false },
+            execute: (input: unknown) => {
+              if (
+                !input ||
+                typeof input !== 'object' ||
+                !('view' in input) ||
+                !nav.some(
+                  ([name]) => name === (input as { view: unknown }).view
+                )
+              ) {
+                throw new Error('Choose a supported workspace view');
+              }
+              const target = (input as { view: string }).view;
+              setView(target);
+              setQuery('');
+              setFilter('All');
+              return { requestedView: target };
+            },
+          },
+          { signal: lifecycle.signal }
+        )
+      ).catch(() => {});
+    } catch {}
+    return () => lifecycle.abort();
+  }, []);
+
+  const create = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const name = ((data.get('name') as string) || '').trim();
+    if (!name) return;
+
+    try {
+      if (modal === 'project') {
+        const year = Number(data.get('year')) || 2026;
+        const status =
+          (data.get('status') as string) ||
+          (editingProject ? editingProject.status : 'New');
+        if (editingProject) {
+          const body = {
+            name,
+            description: data.get('description') as string,
+            status,
+            year,
+            progress: Number(data.get('progress')),
+            department: data.get('department') as string,
+            due: data.get('due') as string,
+          };
+          const p = await patch<Project>(`/projects/${editingProject.id}`, body);
+          setProjects(projects.map((x) => (x.id === p.id ? p : x)));
+          if (detail?.id === p.id) setDetail(p);
+          setEditingProject(null);
+        } else {
+          const p = await post<Project>('/projects', {
+            name,
+            description:
+              (data.get('description') as string) || 'Ready to get started.',
+            year,
+            status,
+            due: (data.get('due') as string) || undefined,
+            workspaceId: activeWorkspace?.id,
+          });
+          setProjects([...projects, p]);
+        }
+      } else if (modal === 'resource') {
+        const body = {
+          name,
+          provider: data.get('provider') as string,
+          type: data.get('type') as string,
+          status: data.get('status') as string,
+          monthlyCost: Number(data.get('monthlyCost')),
+        };
+        if (editingResource) {
+          const r = await patch<Resource>(
+            `/resources/${editingResource.id}`,
+            body
+          );
+          setResourceRows(resourceRows.map((x) => (x.id === r.id ? r : x)));
+        } else {
+          const r = await post<Resource>('/resources', body);
+          setResourceRows([...resourceRows, r]);
+        }
+        setEditingResource(null);
+      } else {
+        const t = await post<ApiTask>('/tasks', {
+          name,
+          description: (data.get('description') as string) || '',
+          projectId: data.get('projectId') as string,
+          ownerId: data.get('ownerId') as string,
+          phase: data.get('phase') as string,
+          start: data.get('start') as string,
+          date: data.get('date') as string,
+        });
+        setTasks([...tasks, withDue(t)]);
+      }
+      setNotice('Saved.');
+      setModal('');
+      setFormError('');
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : 'Something went wrong.');
+    }
+  };
+
+  const finishTask = async (id: string) => {
+    try {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, status: 'Done' } : t))
+      );
+      if (selectedTask?.id === id) {
+        setSelectedTask((prev) => (prev ? { ...prev, status: 'Done' } : null));
+      }
+      const t = await patch<ApiTask>(`/tasks/${id}`, { status: 'Done' });
+      setTasks((prev) => prev.map((x) => (x.id === id ? withDue(t) : x)));
+      if (selectedTask?.id === id) setSelectedTask(withDue(t));
+    } catch (e) {
+      await loadAll();
+      setNotice(e instanceof Error ? e.message : 'Could not update task.');
+    }
+  };
+
+  const editTask = async (id: string, changes: Record<string, unknown>) => {
+    const updatedOwner = changes.ownerId
+      ? users.find((u) => u.id === changes.ownerId)
+      : undefined;
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        return {
+          ...t,
+          ...changes,
+          start:
+            changes.start !== undefined ? (changes.start as string) : t.start,
+          date: changes.date !== undefined ? (changes.date as string) : t.date,
+          due:
+            changes.date !== undefined
+              ? (changes.date as string) || 'Not set'
+              : t.due,
+          ownerName: updatedOwner ? updatedOwner.name : t.ownerName,
+        };
+      })
+    );
+    if (selectedTask?.id === id) {
+      setSelectedTask((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...changes,
+              start:
+                changes.start !== undefined
+                  ? (changes.start as string)
+                  : prev.start,
+              date:
+                changes.date !== undefined
+                  ? (changes.date as string)
+                  : prev.date,
+              due:
+                changes.date !== undefined
+                  ? (changes.date as string) || 'Not set'
+                  : prev.due,
+              ownerName: updatedOwner ? updatedOwner.name : prev.ownerName,
+            }
+          : null
+      );
+    }
+    try {
+      const t = await patch<ApiTask>(`/tasks/${id}`, changes);
+      setTasks((prev) => prev.map((x) => (x.id === id ? withDue(t) : x)));
+      if (selectedTask?.id === id) {
+        setSelectedTask(withDue(t));
+      }
+    } catch (e) {
+      await loadAll();
+      throw e;
+    }
+  };
+
+  const removeTask = async (id: string) => {
+    try {
+      await destroy(`/tasks/${id}`);
+      setTasks(tasks.filter((t) => t.id !== id));
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Could not delete task.');
+    }
+  };
+
+  const removeProject = async (id: string) => {
+    if (!confirm('Delete this project and all its tasks?')) return;
+    try {
+      await destroy(`/projects/${id}`);
+      setProjects(projects.filter((p) => p.id !== id));
+      setTasks(tasks.filter((t) => t.projectId !== id));
+      navigate('Projects');
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Could not delete project.');
+    }
+  };
+
+  const removeResource = async (id: string) => {
+    if (!confirm('Delete this resource?')) return;
+    try {
+      await destroy(`/resources/${id}`);
+      setResourceRows(resourceRows.filter((r) => r.id !== id));
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Could not delete resource.');
+    }
+  };
+
+  const removeArticle = async (id: string) => {
+    if (!confirm('Delete this article?')) return;
+    try {
+      await destroy(`/knowledge/${id}`);
+      setKnowledge(knowledge.filter((k) => k.id !== id));
+      setArticle(null);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Could not delete article.');
+    }
+  };
+
+  const logout = async () => {
+    await post('/auth/logout', {});
+    setMe(null);
+  };
+
+  if (me === undefined) return <div className="app-loading">Loading…</div>;
+  if (me === null) {
+    return (
+      <Login
+        onLogin={(m) => {
+          setMe(m);
+          loadAll();
+        }}
+      />
+    );
+  }
+
+  const members = users.map(
+    (u) =>
+      [u.name, u.title, initials(u.name), computeWorkload(tasks, u.id)] as const
+  );
+  const activeUsers = users.filter((u) => u.isActive);
+  const navItems =
+    me.role === 'admin'
+      ? [...nav, ['Admin', Shield] as const, ['Logs & Audit', History] as const]
+      : me.role === 'auditor'
+        ? [...nav, ['Logs & Audit', History] as const]
+        : nav;
+  const selectedTasks = detail
+    ? (projectTasks(tasks, detail.id) as Task[])
+    : [];
+  const visibleKnowledge = filterArticles(knowledge, query, filter) as Article[];
+  const visibleProjects = filterItems(
+    projects,
+    query,
+    filter,
+    yearFilter
+  ) as Project[];
+  const visibleTasks = filterItems(tasks, query, filter) as Task[];
+  const totalMonthly = resourceRows.reduce((sum, r) => sum + r.monthlyCost, 0);
+  const spendByProvider = Object.entries(
+    resourceRows.reduce<Record<string, number>>((acc, r) => {
+      acc[r.provider] = (acc[r.provider] || 0) + r.monthlyCost;
+      return acc;
+    }, {})
+  );
+
+  const openCreate = () => {
+    if (view === 'Knowledge') {
       setEditingArticle(null);
       setArticleEditorOpen(true);
       return;
     }
-    setEditing(null);setEditingProject(null);setEditingResource(null);setFormError('');
-    setModal(view==='Tasks'||view==='Project workspace'?'task':'project');
+    setEditingProject(null);
+    setEditingResource(null);
+    setFormError('');
+    if (view === 'Cloud resources') {
+      setModal('resource');
+    } else if (view === 'Tasks' || view === 'Project workspace') {
+      setModal('task');
+    } else {
+      setModal('project');
+    }
   };
-  return <SidebarProvider><Sidebar className="app-sidebar"><SidebarHeader><div className="brand"><span className="brand-icon"><Cloud size={25}/></span> cloudteam<span className="brand-dot">.</span></div><WorkspaceSwitcher workspaces={workspaces} activeWorkspace={activeWorkspace} onSelect={(ws)=>{setActiveWorkspace(ws);loadAll(ws.id);}} onWorkspaceCreated={(ws)=>{setWorkspaces(prev=>[...prev,ws]);setActiveWorkspace(ws);loadAll(ws.id);}} currentUser={me}/></SidebarHeader><SidebarContent><p className="nav-label">WORKSPACE</p><SidebarMenu>{navItems.map(([name,Icon])=><SidebarMenuItem key={name}><SidebarMenuButton isActive={view===name||(name==='Projects'&&view==='Project workspace')} onClick={()=>navigate(name)} className="nav-button"><Icon/><span>{name}</span>{name==='Tasks'&&<span className="nav-count">{tasks.filter(t=>t.status!=='Done').length}</span>}</SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu><div className="sidebar-note"><span className="status-dot"/> All systems operational<small>Sample infrastructure status</small></div></SidebarContent> <SidebarFooter><div className="profile cursor-pointer hover:bg-slate-50 transition-colors" onClick={()=>setProfileDialogOpen(true)} role="button" tabIndex={0} title="Click to manage account & security"><span className="avatar">{initials(me.name)}</span><div className="flex-1 min-w-0"><strong className="truncate block">{me.name}</strong><small className="truncate block">{me.role==='admin'?'Workspace admin':me.role==='auditor'?'Compliance auditor':'Team member'}</small></div><button className="text-button" aria-label="Log out" onClick={(e)=>{e.stopPropagation();logout();}}><LogOut size={16}/></button></div></SidebarFooter></Sidebar><main className="main"><header className="topbar"><div className="breadcrumb"><SidebarTrigger/><span>Workspace</span><span>/</span><strong>{view}</strong></div><button className="copilot-open" onClick={()=>setCopilotOpen(true)}><Sparkles size={16}/> Ask Copilot</button></header><div className="content">{me.role==='auditor'&&<div className="bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 px-4 py-2.5 rounded-lg flex items-center gap-2 mb-4 text-xs font-medium"><ShieldAlert size={16}/><span>🛡️ Compliance Inspector Mode (Read-Only) — ISO 27001 & Bank of Thailand (BOT) Segregation of Duties active. Editing and deletion controls are restricted.</span></div>}<div className="page-heading"><div><div className="eyebrow">YOUR WORKSPACE, CONNECTED</div><h1>{view==='Overview'?'Team overview':view==='Project workspace'?detail?.name:view==='Knowledge'?'Knowledge hub':view==='Compliance and Governance'?'Compliance and Governance':view==='Logs & Audit'?'Audit & Access Logs':view}</h1><p>{view==='Overview'?'A little clarity for everything your team is building.':({Projects:'Keep every initiative moving in the right direction.',Tasks:'Turn today’s priorities into progress.',Team:'The people behind your cloud.',Knowledge:'Shared knowledge. Fewer repeat questions.','Project workspace':'Tasks, owners and the timeline — together in one place.','Compliance and Governance':'Central oversight of ISO 27001 & Bank of Thailand (BOT) audit readiness and IT governance.',Reports:'A closer look at your team and infrastructure.','Cloud resources':'Multi-cloud infrastructure asset inventory and FinOps governance.',Admin:'Manage who can access this workspace.','Logs & Audit':'Inspect immutable transaction audit trail, authentication attempts, and regulatory compliance logs.'} as Record<string,string>)[view]}</p></div>{view!=='Admin'&&view!=='Logs & Audit'&&view!=='Compliance and Governance'&&view!=='Cloud resources'&&me.role!=='auditor'&&<button className="primary" onClick={openCreate}><Plus size={17}/>{view==='Knowledge'?'New article':view==='Tasks'||view==='Project workspace'?'Create task':'Create project'}</button>}</div>{notice&&<output className="notice">{notice}<button aria-label="Dismiss message" onClick={()=>setNotice('')}>×</button></output>}
-{view==='Overview'&&<><div className="welcome-strip"><span className="welcome-icon"><Activity size={20}/></span><div><strong>Good things are moving.</strong><span> Your team is building across {projects.length} projects ({projects.filter(p=>p.status==='Completed').length} completed).</span></div><span className="week-pill">Week 37</span></div><div className="stats">{([[FolderKanban,'Active projects',String(projects.filter(p=>p.status!=='Completed').length),`Across ${new Set(projects.map(p=>p.department)).size||0} teams`],[Users,'Team members',String(users.length),'On the roster'],[Check,'Open tasks',String(tasks.filter(t=>t.status!=='Done').length),'Keep the momentum going'],[Cloud,'Monthly cloud spend','$'+totalMonthly.toLocaleString(),'From your inventory']] as const).map(([Icon,label,value,foot])=><section className="stat" key={label}><div><span>{label}</span><Icon size={18}/></div><strong>{value}</strong><small><span className="green">↗</span> {foot}</small></section>)}</div><div className="section-heading"><h2>Active projects <span>{projects.filter(p=>p.status!=='Completed').length}</span></h2><button className="text-button" onClick={()=>navigate('Projects')}>All projects <ArrowRight size={15}/></button></div></>}
-{(view==='Overview'||view==='Projects')&&<>{view==='Projects'&&<div className="toolbar flex flex-col md:flex-row gap-3"><label className="search"><Search size={17}/><input aria-label="Search projects" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search projects…"/></label><div className="flex flex-wrap items-center gap-2"><div className="filter-buttons">{['All Years','2025','2026','2027'].map(y=>{const val=y==='All Years'?'All':y;return <button className={yearFilter===val?'selected':''} onClick={()=>setYearFilter(val)} key={y}>{y}</button>;})}</div><div className="filter-buttons">{['All','Active','New','On track','At risk','Completed'].map(s=><button className={filter===s?'selected':''} onClick={()=>setFilter(s)} key={s}>{s}</button>)}</div></div></div>}<div className="project-grid">{(view==='Overview'?projects.slice(0,3):visibleProjects).map(p=><button className="project-card" key={p.id} onClick={()=>{setDetail(p);navigate('Project workspace')}}><div className="card-top"><span className={'project-icon '+p.color}><FolderKanban size={21}/></span><div className="flex items-center gap-1.5"><span className="badge year-badge">FY{p.year||2026}</span><span className={'badge '+(p.status==='Completed'?'completed-badge':p.status==='New'?'blue-badge':p.status==='At risk'?'amber':'green-badge')}>{p.status==='Completed'?'✓ Completed':'• '+p.status}</span></div></div><h3>{p.name}</h3><p>{p.description}</p><div className="progress-label"><span>Progress</span><strong>{p.progress}%</strong></div><Progress value={p.progress} aria-label={`${p.name} progress`}/><div className="project-footer"><span className="badge">{p.department}</span><span><Clock size={13}/> {p.due}</span></div></button>)}</div>{view==='Projects'&&visibleProjects.length===0&&<p className="empty">No projects match your search.</p>}</>}
-{view==='Overview'&&<div className="lower-grid"><section className="panel"><div className="panel-heading"><div><h2>Your priorities</h2><p>A clear focus for the days ahead.</p></div><button className="text-button" onClick={()=>navigate('Tasks')}>View tasks <ArrowRight size={15}/></button></div>{tasks.slice(0,4).map(t=><div className="task-row" key={t.id} onClick={()=>setSelectedTask(t)}><button className={'complete '+(t.status==='Done'?'done':'')} disabled={t.status==='Done'} aria-label={`Complete ${t.name}`} onClick={(e)=>{e.stopPropagation();finishTask(t.id)}}>{t.status==='Done'&&<Check size={13}/>}</button><div><strong className={t.status==='Done'?'struck':''}>{t.name}</strong><small>{t.ownerName} <span>·</span> {t.due}</small></div><span className={'priority '+(t.priority==='High'?'high':'')}>{t.priority}</span></div>)}{tasks.length===0&&<p className="empty">No tasks yet.</p>}</section><section className="panel"><div className="panel-heading"><div><h2>Team workload</h2><p>Room to do great work.</p></div><Users size={18}/></div>{members.slice(0,6).map(([name,_role,initial,load],i)=><div className="workload" key={name}><span className={'avatar '+(['','blue','pink','orange'][i%4])}>{initial}</span><div><div><strong>{name}</strong><span>{load}%</span></div><Progress value={load} aria-label={`${name} workload`} className={load>85?'busy':''}/></div></div>)}<button className="team-link" onClick={()=>navigate('Team')}>Meet your team <ArrowUpRight size={15}/></button></section></div>}
-{view==='Tasks'&&<><div className="toolbar"><label className="search"><Search size={17}/><input aria-label="Search tasks" placeholder="Search tasks…" value={query} onChange={e=>setQuery(e.target.value)}/></label><div className="filter-buttons">{['All','To do','In progress','Done'].map(s=><button key={s} className={filter===s?'selected':''} onClick={()=>setFilter(s)}>{s}</button>)}</div></div><div className="kanban">{['To do','In progress','Done'].map(status=><section className="kanban-column" key={status}><h2>{status}<span>{visibleTasks.filter(t=>t.status===status).length}</span></h2>{visibleTasks.filter(t=>t.status===status).map(t=><article className="task-card" key={t.id} onClick={()=>setSelectedTask(t)}><span className={'priority '+(t.priority==='High'?'high':'')}>{t.priority}</span><h3>{t.name}</h3><p>{t.ownerName}</p><div><span>{t.due}</span>{status!=='Done'&&<button className="text-button" onClick={(e)=>{e.stopPropagation();finishTask(t.id)}}><Check size={14}/> Complete</button>}</div></article>)}{visibleTasks.filter(t=>t.status===status).length===0&&<p className="empty">No tasks here.</p>}</section>)}</div></>}
-{view==='Team'&&<div className="team-grid">{members.map(([name,role,initial,load],i)=><section className="panel member" key={name}><span className={'avatar large '+['','blue','pink','orange'][i%4]}>{initial}</span><h2>{name}</h2><p>{role}</p><span className="badge green-badge">• Available</span><div className="progress-label"><span>Weekly capacity used</span><strong>{load}%</strong></div><Progress value={load} aria-label={`${name} workload`}/></section>)}{members.length===0&&<p className="empty">No team members yet.</p>}</div>}
-{view==='Cloud resources'&&<div className="panel" style={{textAlign:'center',padding:'64px 24px',maxWidth:'820px',margin:'0 auto'}}>
-  <div style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'64px',height:'64px',borderRadius:'16px',background:'rgba(124, 58, 237, 0.1)',color:'var(--primary, #7c3aed)',marginBottom:'20px'}}>
-    <Server size={32}/>
-  </div>
-  <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:'8px',marginBottom:'12px'}}>
-    <span className="badge blue-badge">Roadmap Feature</span>
-    <span className="badge" style={{background:'rgba(124, 58, 237, 0.15)',color:'#7c3aed',fontWeight:600}}>Coming Soon</span>
-  </div>
-  <h2 style={{fontSize:'24px',fontWeight:700,marginBottom:'8px'}}>Multi-Cloud Resources & FinOps Inventory</h2>
-  <p style={{color:'var(--muted-foreground, #64748b)',fontSize:'15px',maxWidth:'580px',margin:'0 auto 28px',lineHeight:1.6}}>
-    Automated multi-cloud asset discovery, FinOps cost governance, and ISO 27001 / Bank of Thailand (BOT) infrastructure compliance mapping are currently scheduled for the upcoming Enterprise Release.
-  </p>
-  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))',gap:'16px',textAlign:'left',marginTop:'16px'}}>
-    <div style={{padding:'16px',borderRadius:'8px',border:'1px solid var(--border, #e2e8f0)',background:'var(--card, #ffffff)'}}>
-      <div style={{fontWeight:600,fontSize:'14px',marginBottom:'4px'}}>☁️ Multi-Cloud Asset Discovery</div>
-      <div style={{fontSize:'12px',color:'var(--muted-foreground, #64748b)'}}>Automated synchronization across AWS, Google Cloud, and Microsoft Azure workloads.</div>
-    </div>
-    <div style={{padding:'16px',borderRadius:'8px',border:'1px solid var(--border, #e2e8f0)',background:'var(--card, #ffffff)'}}>
-      <div style={{fontWeight:600,fontSize:'14px',marginBottom:'4px'}}>🛡️ BOT & ISO 27001 Tagging</div>
-      <div style={{fontSize:'12px',color:'var(--muted-foreground, #64748b)'}}>Mandatory data classification tags, asset ownership, and outsourcing risk register mapping.</div>
-    </div>
-    <div style={{padding:'16px',borderRadius:'8px',border:'1px solid var(--border, #e2e8f0)',background:'var(--card, #ffffff)'}}>
-      <div style={{fontWeight:600,fontSize:'14px',marginBottom:'4px'}}>📊 FinOps & Budget Anomaly</div>
-      <div style={{fontSize:'12px',color:'var(--muted-foreground, #64748b)'}}>Real-time spend anomaly detection, idle resource reclamation, and department cost allocation.</div>
-    </div>
-  </div>
-</div>}
-{view==='Reports'&&<><div className="resource-banner"><span className="project-icon purple"><Cloud size={28}/></span><div><h2>Cloud spend overview</h2><p>September 2026 · Live inventory</p></div><strong>${totalMonthly.toLocaleString()}<small>/ month</small></strong></div><section className="panel report"><h2>Spend by provider</h2>{spendByProvider.map(([name,amount])=><div key={name}><div className="progress-label"><strong>{name}</strong><span>${amount.toLocaleString()}</span></div><Progress value={totalMonthly?Math.round(amount/totalMonthly*100):0} aria-label={`${name} share of spend`}/></div>)}{spendByProvider.length===0&&<p className="empty">No resources yet.</p>}</section></>}
-{view==='Project workspace'&&detail&&<><button className="text-button back-link" onClick={()=>navigate('Projects')}>← All projects</button><div className="project-summary"><span className={'project-icon '+detail.color}><FolderKanban size={23}/></span><div><div className="flex items-center gap-2 mb-1"><h2>{detail.name}</h2><span className="badge year-badge">FY{detail.year||2026}</span><span className="badge">{detail.department}</span></div><p>{detail.description}</p></div><span className={'badge '+(detail.status==='Completed'?'completed-badge':detail.status==='New'?'blue-badge':detail.status==='At risk'?'amber':'green-badge')}>{detail.status==='Completed'?'✓ Completed':detail.status}</span><div className="project-completion"><strong>{selectedTasks.filter(t=>t.status==='Done').length} / {selectedTasks.length}</strong><span>tasks complete</span></div></div><div className="task-controls">{me.role!=='auditor'&&<><button className="primary" onClick={()=>{setEditing(null);setFormError('');setModal('task')}}><Plus size={15}/> Add task</button><button className="text-button" onClick={()=>{setEditingProject(detail);setFormError('');setModal('project')}}><Pencil size={14}/> Edit project</button><button className="text-button" onClick={()=>removeProject(detail.id)}>Delete project</button></>}</div><div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 mb-4 pb-1"><button className={`px-3 py-1.5 rounded-md text-sm font-medium ${projectTab==='tasks'?'bg-slate-200 dark:bg-slate-700 font-semibold':'text-slate-500 hover:text-slate-900 dark:text-slate-400'}`} onClick={()=>setProjectTab('tasks')}>Tasks & Timeline</button><button className={`px-3 py-1.5 rounded-md text-sm font-medium ${projectTab==='documents'?'bg-slate-200 dark:bg-slate-700 font-semibold':'text-slate-500 hover:text-slate-900 dark:text-slate-400'}`} onClick={()=>setProjectTab('documents')}>Audit Documents (ISO/BOT)</button></div>{projectTab==='tasks'?(<ProjectGantt readOnly={me.role==='auditor'} tasks={selectedTasks.map(t=>({...t,owner:t.ownerName}))} owners={activeUsers.map(u=>({id:u.id,name:u.name}))} onSelect={t=>{const found=tasks.find(x=>x.id===t.id);if(found)setSelectedTask(found);}} onAdd={()=>{if(me.role==='auditor')return;setFormError('');setEditing(null);setModal('task')}} onUpdate={(id,changes)=>{if(me.role==='auditor')return;editTask(id,changes).catch(e=>setNotice(e instanceof Error?e.message:'Could not update task.'))}} onDelete={id=>{if(me.role==='auditor')return;removeTask(id)}}/>):(<ProjectDocuments projectId={detail.id} currentUser={me}/>)}</>}
-{view==='Compliance and Governance'&&<ComplianceMatrix projects={projects} currentUser={me} onSelectProject={(projectId,tab)=>{const p=projects.find(x=>x.id===projectId);if(p){setDetail(p);setView('Project workspace');if(tab==='documents')setProjectTab('documents');else setProjectTab('tasks');}}}/>}
-{view==='Knowledge'&&<><div className="knowledge-banner"><span className="project-icon purple"><BookOpen size={26}/></span><div><h2>A home for what your team knows</h2><p>Runbooks, onboarding, guides, and interactive tools, all in one place.</p></div><div className="flex items-center gap-2.5 ml-auto">{me.role!=='auditor'&&<button type="button" className="text-button flex items-center gap-1.5 bg-white border border-purple-200 px-3 py-1.5 rounded-md text-xs font-semibold text-purple-700 shadow-sm hover:bg-purple-50" onClick={()=>setCategoryManagerOpen(true)}><Layers size={14}/> Manage categories</button>}<span className="text-sm font-medium text-purple-900/80">{knowledge.length} articles</span></div></div><div className="toolbar"><label className="search"><Search size={17}/><input aria-label="Search knowledge" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search titles and content…"/></label><div className="filter-buttons">{['All',...categories.map(c=>c.name)].map(c=><button key={c} className={filter===c?'selected':''} onClick={()=>setFilter(c)}>{c}</button>)}</div></div><div className="knowledge-grid">{(visibleKnowledge as Article[]).map((k: Article)=><button className="knowledge-card" key={k.id} onClick={()=>setArticle(k)}><div><span className="project-icon purple"><FileText size={20}/></span><div className="flex items-center gap-1.5">{k.format==='html'&&<span className="badge bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-semibold">⚡ HTML</span>}<span className="badge">{k.category}</span></div></div><h2>{highlightMatches(k.name,query).map((s,idx)=>s.match?<mark key={idx} className="search-highlight">{s.text}</mark>:<span key={idx}>{s.text}</span>)}</h2><p>{highlightMatches(snippetWithMatch(k.body,query,145),query).map((s,idx)=>s.match?<mark key={idx} className="search-highlight">{s.text}</mark>:<span key={idx}>{s.text}</span>)}</p><footer><span>{k.author.name}</span><span className="text-button">Read article <ArrowUpRight size={14}/></span></footer></button>)}</div>{visibleKnowledge.length===0&&<p className="empty">No articles found. Try another search or create a new article.</p>}</>}
-{view==='Admin'&&me.role==='admin'&&<AdminPanel users={users} onChange={setUsers}/>}
-{view==='Logs & Audit'&&(me.role==='admin'||me.role==='auditor')&&<LogsViewer currentUser={me} activeWorkspaceId={activeWorkspace?.id}/>}
-<footer className="page-footer"><span><span className="status-dot"/> Cloud Team Management</span><span>Self-hosted workspace</span></footer></div></main><Dialog open={!!modal} onOpenChange={open=>{if(!open){setModal('');setFormError('');setEditingProject(null);setEditingResource(null);setEditing(null);}}}><DialogContent><DialogHeader><DialogTitle>{(editingProject||editingResource)?'Edit':'Create'} {modal}</DialogTitle><DialogDescription>{(editingProject||editingResource)?'Update this':'Add a new'} {modal}.</DialogDescription></DialogHeader><form className="create-form" onSubmit={create}><label>Name<input name="name" required maxLength={100} defaultValue={editingProject?.name||editingResource?.name||''} placeholder={modal==='project'?'e.g. Platform modernization':modal==='resource'?'e.g. production-api':'e.g. Review deployment checklist'}/></label>{modal==='project'&&<><label>Description<textarea name="description" maxLength={2000} rows={3} defaultValue={editingProject?.description||''} placeholder="Project scope, objectives, architecture overview..."/></label><div className="form-columns"><label>Year<NativeSelect name="year" defaultValue={String(editingProject?.year||2026)}>{['2024','2025','2026','2027','2028'].map(y=><NativeSelectOption key={y} value={y}>{y}</NativeSelectOption>)}</NativeSelect></label><label>Status<NativeSelect name="status" defaultValue={editingProject?.status||'New'}>{['New','On track','At risk','Completed'].map(s=><NativeSelectOption key={s} value={s}>{s}</NativeSelectOption>)}</NativeSelect></label><label>Due date<input type="date" name="due" defaultValue={(editingProject?.due||'').slice(0,10)} onClick={e=>e.currentTarget.showPicker?.()}/></label></div>{editingProject&&<div className="form-columns"><label>Progress %<input name="progress" type="number" min={0} max={100} defaultValue={editingProject.progress}/></label><label>Team<input name="department" defaultValue={editingProject.department}/></label></div>}</>}{modal==='task'&&<><label>Project<NativeSelect name="projectId" defaultValue={view==='Project workspace'?detail?.id:projects[0]?.id} required>{projects.map(p=><NativeSelectOption key={p.id} value={p.id}>{p.name}</NativeSelectOption>)}</NativeSelect></label><div className="form-columns"><label>Owner<NativeSelect name="ownerId" required>{activeUsers.map(u=><NativeSelectOption key={u.id} value={u.id}>{u.name}</NativeSelectOption>)}</NativeSelect></label><label>Start date<input type="date" name="start" onClick={e=>e.currentTarget.showPicker?.()}/></label><label>Finish date<input type="date" name="date" onClick={e=>e.currentTarget.showPicker?.()}/></label><label>Phase<input name="phase" list="task-modal-phases" defaultValue="Planning" placeholder="e.g. Planning, Testing, Audit"/><datalist id="task-modal-phases">{['Planning','Development','Testing','Launch','Audit'].map(p=><option key={p} value={p}/>)}</datalist></label></div><label>Description (optional)<textarea name="description" maxLength={10000} placeholder="Add detailed runbooks, checklists, commands or notes for this task..." rows={3}/></label></>}{modal==='resource'&&<div className="form-columns"><label>Provider<input name="provider" required defaultValue={editingResource?.provider||''}/></label><label>Type<input name="type" required defaultValue={editingResource?.type||''}/></label><label>Status<NativeSelect name="status" defaultValue={editingResource?.status||'Healthy'}>{['Healthy','Review needed'].map(s=><NativeSelectOption key={s}>{s}</NativeSelectOption>)}</NativeSelect></label><label>Monthly cost $<input name="monthlyCost" type="number" min={0} defaultValue={editingResource?.monthlyCost??0}/></label></div>}{formError&&<p className="form-error" role="alert">{formError}</p>}<button className="primary" type="submit"><Plus size={16}/>{(editingProject||editingResource)?'Save changes':`Create ${modal}`}</button></form></DialogContent></Dialog><ArticleEditorDialog open={articleEditorOpen} onOpenChange={setArticleEditorOpen} editing={editingArticle} categories={categories} projects={projects} currentUser={me} onSave={async(articleData)=>{if(editingArticle){const a=await patch<Article>(`/knowledge/${editingArticle.id}`,articleData);setKnowledge(knowledge.map(k=>k.id===a.id?a:k));setNotice('Article updated.');}else{const a=await post<Article>('/knowledge',articleData);setKnowledge([...knowledge,a]);setNotice('Article created.');}}} /><ArticleReaderDialog article={article} currentUser={me} onClose={()=>setArticle(null)} onEdit={a=>{setArticle(null);setEditingArticle(a);setArticleEditorOpen(true);}} onConvertToTasks={a=>{setCopilotInitialPrompt(`Please extract all actionable checklist steps from the runbook "${a.name}" and draft them into tasks:\n\n${a.body.slice(0,3000)}`);setArticle(null);setCopilotOpen(true);}} onDelete={aId=>removeArticle(aId)} onChange={a=>{setArticle(a);setKnowledge(knowledge.map(k=>k.id===a.id?a:k));}}/><CategoryManagerDialog open={categoryManagerOpen} onOpenChange={setCategoryManagerOpen} categories={categories} articles={knowledge} onCategoriesChanged={loadAll}/><CopilotPanel open={copilotOpen} onClose={()=>{setCopilotOpen(false);setCopilotInitialPrompt('');}} initialPrompt={copilotInitialPrompt} projects={projects.map(p=>({id:p.id,name:p.name}))} owners={activeUsers.map(u=>({id:u.id,name:u.name}))} currentUser={me} onSaveArticle={async(art)=>{const a=await post<Article>('/knowledge',art);setKnowledge(prev=>[...prev,a]);setNotice('Report saved as Knowledge Article.');}} onTaskCreated={loadAll} onProjectCreated={loadAll}/><TaskDrawer task={selectedTask} open={!!selectedTask} onClose={()=>setSelectedTask(null)} projects={projects} owners={activeUsers.map(u=>({id:u.id,name:u.name}))} articles={knowledge} projectDocuments={projectDocuments} onOpenArticle={aId=>{const a=knowledge.find(k=>k.id===aId);if(a)setArticle(a);}} onUpdate={async(id,changes)=>{if(me.role==='auditor')return;await editTask(id,changes);setNotice('Task updated.');}} onDelete={async(id)=>{if(me.role==='auditor')return;await removeTask(id);setSelectedTask(null);setNotice('Task deleted.');}}/><UserProfileDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} currentUser={me} onUserUpdated={u=>setMe(u)}/></SidebarProvider>;
+
+  const pageTitle =
+    view === 'Overview'
+      ? 'Team overview'
+      : view === 'Project workspace'
+        ? detail?.name
+        : view === 'Knowledge'
+          ? 'Knowledge hub'
+          : view === 'Compliance and Governance'
+            ? 'Compliance and Governance'
+            : view === 'Logs & Audit'
+              ? 'Audit & Access Logs'
+              : view;
+
+  const createButtonLabel =
+    view === 'Knowledge'
+      ? 'New article'
+      : view === 'Cloud resources'
+        ? 'Add resource'
+        : view === 'Tasks' || view === 'Project workspace'
+          ? 'Create task'
+          : 'Create project';
+
+  return (
+    <SidebarProvider>
+      <Sidebar className="app-sidebar">
+        <SidebarHeader>
+          <div className="brand">
+            <span className="brand-icon">
+              <Cloud size={25} />
+            </span>{' '}
+            cloudteam<span className="brand-dot">.</span>
+          </div>
+          <WorkspaceSwitcher
+            workspaces={workspaces}
+            activeWorkspace={activeWorkspace}
+            onSelect={(ws) => {
+              setActiveWorkspace(ws);
+              loadAll(ws.id);
+            }}
+            onWorkspaceCreated={(ws) => {
+              setWorkspaces((prev) => [...prev, ws]);
+              setActiveWorkspace(ws);
+              loadAll(ws.id);
+            }}
+            currentUser={me}
+          />
+        </SidebarHeader>
+
+        <SidebarContent>
+          <p className="nav-label">WORKSPACE</p>
+          <SidebarMenu>
+            {navItems.map(([name, Icon]) => (
+              <SidebarMenuItem key={name}>
+                <SidebarMenuButton
+                  isActive={
+                    view === name ||
+                    (name === 'Projects' && view === 'Project workspace')
+                  }
+                  onClick={() => navigate(name)}
+                  className="nav-button"
+                >
+                  <Icon />
+                  <span>{name}</span>
+                  {name === 'Tasks' && (
+                    <span className="nav-count">
+                      {tasks.filter((t) => t.status !== 'Done').length}
+                    </span>
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+          <div className="sidebar-note">
+            <span className="status-dot" /> All systems operational
+            <small>Sample infrastructure status</small>
+          </div>
+        </SidebarContent>
+
+        <SidebarFooter>
+          <div
+            className="profile cursor-pointer hover:bg-slate-50 transition-colors"
+            onClick={() => setProfileDialogOpen(true)}
+            role="button"
+            tabIndex={0}
+            title="Click to manage account & security"
+          >
+            <span className="avatar">{initials(me.name)}</span>
+            <div className="flex-1 min-w-0">
+              <strong className="truncate block">{me.name}</strong>
+              <small className="truncate block">
+                {me.role === 'admin'
+                  ? 'Workspace admin'
+                  : me.role === 'auditor'
+                    ? 'Compliance auditor'
+                    : 'Team member'}
+              </small>
+            </div>
+            <button
+              className="text-button"
+              aria-label="Log out"
+              onClick={(e) => {
+                e.stopPropagation();
+                logout();
+              }}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        </SidebarFooter>
+      </Sidebar>
+
+      <main className="main">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <SidebarTrigger />
+            <span>Workspace</span>
+            <span>/</span>
+            <strong>{view}</strong>
+          </div>
+          <button
+            className="copilot-open"
+            onClick={() => setCopilotOpen(true)}
+          >
+            <Sparkles size={16} /> Ask Copilot
+          </button>
+        </header>
+
+        <div className="content">
+          {me.role === 'auditor' && (
+            <div className="bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 px-4 py-2.5 rounded-lg flex items-center gap-2 mb-4 text-xs font-medium">
+              <ShieldAlert size={16} />
+              <span>
+                🛡️ Compliance Inspector Mode (Read-Only) — ISO 27001 & Bank of
+                Thailand (BOT) Segregation of Duties active. Editing and
+                deletion controls are restricted.
+              </span>
+            </div>
+          )}
+
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow">YOUR WORKSPACE, CONNECTED</div>
+              <h1>{pageTitle}</h1>
+              <p>{VIEW_DESCRIPTIONS[view]}</p>
+            </div>
+            {view !== 'Admin' &&
+              view !== 'Logs & Audit' &&
+              view !== 'Compliance and Governance' &&
+              me.role !== 'auditor' && (
+                <button className="primary" onClick={openCreate}>
+                  <Plus size={17} />
+                  {createButtonLabel}
+                </button>
+              )}
+          </div>
+
+          {notice && (
+            <output className="notice">
+              {notice}
+              <button
+                aria-label="Dismiss message"
+                onClick={() => setNotice('')}
+              >
+                ×
+              </button>
+            </output>
+          )}
+
+          {view === 'Overview' && (
+            <OverviewView
+              projects={projects}
+              tasks={tasks}
+              users={users}
+              members={members}
+              totalMonthly={totalMonthly}
+              onNavigate={navigate}
+              onOpenProject={(p) => {
+                setDetail(p);
+                navigate('Project workspace');
+              }}
+              onSelectTask={setSelectedTask}
+              onFinishTask={finishTask}
+            />
+          )}
+
+          {view === 'Projects' && (
+            <ProjectsView
+              visibleProjects={visibleProjects}
+              query={query}
+              filter={filter}
+              yearFilter={yearFilter}
+              onQueryChange={setQuery}
+              onFilterChange={setFilter}
+              onYearFilterChange={setYearFilter}
+              onOpenProject={(p) => {
+                setDetail(p);
+                navigate('Project workspace');
+              }}
+            />
+          )}
+
+          {view === 'Tasks' && (
+            <TasksKanbanView
+              visibleTasks={visibleTasks}
+              query={query}
+              filter={filter}
+              readOnly={me.role === 'auditor'}
+              onQueryChange={setQuery}
+              onFilterChange={setFilter}
+              onSelectTask={setSelectedTask}
+              onFinishTask={finishTask}
+            />
+          )}
+
+          {view === 'Team' && <TeamView members={members} />}
+
+          {view === 'Cloud resources' && (
+            <CloudResourcesView
+              resources={resourceRows}
+              readOnly={me.role === 'auditor'}
+              onAddResource={() => {
+                setEditingResource(null);
+                setFormError('');
+                setModal('resource');
+              }}
+              onEditResource={(r) => {
+                setEditingResource(r);
+                setFormError('');
+                setModal('resource');
+              }}
+              onDeleteResource={removeResource}
+            />
+          )}
+
+          {view === 'Reports' && (
+            <ReportsView
+              totalMonthly={totalMonthly}
+              spendByProvider={spendByProvider}
+            />
+          )}
+
+          {view === 'Project workspace' && detail && (
+            <ProjectWorkspaceView
+              detail={detail}
+              selectedTasks={selectedTasks}
+              allTasks={tasks}
+              activeUsers={activeUsers}
+              currentUser={me}
+              projectTab={projectTab}
+              onTabChange={setProjectTab}
+              onBack={() => navigate('Projects')}
+              onAddTask={() => {
+                setFormError('');
+                setModal('task');
+              }}
+              onEditProject={(p) => {
+                setEditingProject(p);
+                setFormError('');
+                setModal('project');
+              }}
+              onDeleteProject={removeProject}
+              onSelectTask={setSelectedTask}
+              onUpdateTask={editTask}
+              onDeleteTask={removeTask}
+              onErrorNotice={setNotice}
+            />
+          )}
+
+          {view === 'Compliance and Governance' && (
+            <Suspense
+              fallback={<div className="panel">Loading compliance matrix…</div>}
+            >
+              <ComplianceMatrix
+                projects={projects}
+                currentUser={me}
+                activeWorkspaceId={activeWorkspace?.id}
+                onSelectProject={(projectId, tab) => {
+                  const p = projects.find((x) => x.id === projectId);
+                  if (p) {
+                    setDetail(p);
+                    setView('Project workspace');
+                    setProjectTab(tab === 'documents' ? 'documents' : 'tasks');
+                  }
+                }}
+              />
+            </Suspense>
+          )}
+
+          {view === 'Knowledge' && (
+            <KnowledgeView
+              totalArticlesCount={knowledge.length}
+              visibleKnowledge={visibleKnowledge}
+              categories={categories}
+              query={query}
+              filter={filter}
+              readOnly={me.role === 'auditor'}
+              onQueryChange={setQuery}
+              onFilterChange={setFilter}
+              onOpenCategoryManager={() => setCategoryManagerOpen(true)}
+              onOpenArticle={setArticle}
+            />
+          )}
+
+          {view === 'Admin' && me.role === 'admin' && (
+            <Suspense
+              fallback={<div className="panel">Loading admin settings…</div>}
+            >
+              <AdminPanel users={users} onChange={setUsers} />
+            </Suspense>
+          )}
+
+          {view === 'Logs & Audit' &&
+            (me.role === 'admin' || me.role === 'auditor') && (
+              <Suspense
+                fallback={<div className="panel">Loading audit trail…</div>}
+              >
+                <LogsViewer
+                  currentUser={me}
+                  activeWorkspaceId={activeWorkspace?.id}
+                />
+              </Suspense>
+            )}
+
+          <footer className="page-footer">
+            <span>
+              <span className="status-dot" /> Cloud Team Management
+            </span>
+            <span>Self-hosted workspace</span>
+          </footer>
+        </div>
+      </main>
+
+      <EntityFormDialog
+        modal={modal}
+        view={view}
+        detail={detail}
+        projects={projects}
+        activeUsers={activeUsers}
+        editingProject={editingProject}
+        editingResource={editingResource}
+        formError={formError}
+        onClose={() => {
+          setModal('');
+          setFormError('');
+          setEditingProject(null);
+          setEditingResource(null);
+        }}
+        onSubmit={create}
+      />
+
+      <Suspense fallback={null}>
+        {articleEditorOpen && (
+          <ArticleEditorDialog
+            open={articleEditorOpen}
+            onOpenChange={setArticleEditorOpen}
+            editing={editingArticle}
+            categories={categories}
+            projects={projects}
+            currentUser={me}
+            onSave={async (articleData) => {
+              if (editingArticle) {
+                const a = await patch<Article>(
+                  `/knowledge/${editingArticle.id}`,
+                  articleData
+                );
+                setKnowledge(knowledge.map((k) => (k.id === a.id ? a : k)));
+                setNotice('Article updated.');
+              } else {
+                const a = await post<Article>('/knowledge', {
+                  ...articleData,
+                  workspaceId: activeWorkspace?.id,
+                });
+                setKnowledge([...knowledge, a]);
+                setNotice('Article created.');
+              }
+            }}
+          />
+        )}
+
+        {article && (
+          <ArticleReaderDialog
+            article={article}
+            currentUser={me}
+            onClose={() => setArticle(null)}
+            onEdit={(a) => {
+              setArticle(null);
+              setEditingArticle(a);
+              setArticleEditorOpen(true);
+            }}
+            onConvertToTasks={(a) => {
+              setCopilotInitialPrompt(
+                `Please extract all actionable checklist steps from the runbook "${a.name}" and draft them into tasks:\n\n${a.body.slice(0, 3000)}`
+              );
+              setArticle(null);
+              setCopilotOpen(true);
+            }}
+            onDelete={(aId) => removeArticle(aId)}
+            onChange={(a) => {
+              setArticle(a);
+              setKnowledge(knowledge.map((k) => (k.id === a.id ? a : k)));
+            }}
+          />
+        )}
+
+        {categoryManagerOpen && (
+          <CategoryManagerDialog
+            open={categoryManagerOpen}
+            onOpenChange={setCategoryManagerOpen}
+            categories={categories}
+            articles={knowledge}
+            onCategoriesChanged={loadAll}
+          />
+        )}
+
+        {copilotOpen && (
+          <CopilotPanel
+            open={copilotOpen}
+            onClose={() => {
+              setCopilotOpen(false);
+              setCopilotInitialPrompt('');
+            }}
+            initialPrompt={copilotInitialPrompt}
+            projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+            owners={activeUsers.map((u) => ({ id: u.id, name: u.name }))}
+            currentUser={me}
+            onSaveArticle={async (art) => {
+              const a = await post<Article>('/knowledge', {
+                ...art,
+                workspaceId: activeWorkspace?.id,
+              });
+              setKnowledge((prev) => [...prev, a]);
+              setNotice('Report saved as Knowledge Article.');
+            }}
+            onTaskCreated={loadAll}
+            onProjectCreated={loadAll}
+          />
+        )}
+
+        {selectedTask && (
+          <TaskDrawer
+            task={selectedTask}
+            open={Boolean(selectedTask)}
+            onClose={() => setSelectedTask(null)}
+            projects={projects}
+            owners={activeUsers.map((u) => ({ id: u.id, name: u.name }))}
+            articles={knowledge}
+            projectDocuments={projectDocuments}
+            onOpenArticle={(aId) => {
+              const a = knowledge.find((k) => k.id === aId);
+              if (a) setArticle(a);
+            }}
+            onUpdate={async (id, changes) => {
+              if (me.role === 'auditor') return;
+              await editTask(id, changes);
+              setNotice('Task updated.');
+            }}
+            onDelete={async (id) => {
+              if (me.role === 'auditor') return;
+              await removeTask(id);
+              setSelectedTask(null);
+              setNotice('Task deleted.');
+            }}
+          />
+        )}
+
+        {profileDialogOpen && (
+          <UserProfileDialog
+            open={profileDialogOpen}
+            onOpenChange={setProfileDialogOpen}
+            currentUser={me}
+            onUserUpdated={(u) => setMe(u)}
+          />
+        )}
+      </Suspense>
+    </SidebarProvider>
+  );
 }
