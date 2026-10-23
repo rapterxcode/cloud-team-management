@@ -15,14 +15,21 @@ services:
     build: { context: ., dockerfile: api/Dockerfile }
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/ctm
+      PORT: ${PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ctm}
       SESSION_SECRET: ${SESSION_SECRET}
+      LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-10}
+      LOGIN_RATE_LIMIT_WINDOW_MINUTES: ${LOGIN_RATE_LIMIT_WINDOW_MINUTES:-15}
+      JSON_BODY_LIMIT: ${JSON_BODY_LIMIT:-256kb}
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ATTACHMENTS_DIR: /attachments
+      MAX_ATTACHMENT_BYTES: ${MAX_ATTACHMENT_BYTES:-26214400}
+      MAX_COPILOT_FILE_BYTES: ${MAX_COPILOT_FILE_BYTES:-15728640}
       NODE_ENV: production
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      COPILOT_SNAPSHOT_BUDGET: ${COPILOT_SNAPSHOT_BUDGET:-1000000}
     volumes:
       - ./attachments:/attachments
     healthcheck:
@@ -38,14 +45,15 @@ services:
     image: postgres:17
     restart: unless-stopped
     environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ctm
+      POSTGRES_DB: ${POSTGRES_DB:-ctm}
     ports:
-      - '127.0.0.1:5432:5432'
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d ctm']
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ctm}']
       interval: 5s
       timeout: 3s
       retries: 10
@@ -55,9 +63,9 @@ services:
     restart: unless-stopped
     environment:
       PGHOST: postgres
-      PGUSER: postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
       PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ctm
+      PGDATABASE: ${POSTGRES_DB:-ctm}
     volumes:
       - backups:/backups
       - ./attachments:/attachments:ro

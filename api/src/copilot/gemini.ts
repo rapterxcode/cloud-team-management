@@ -1,4 +1,5 @@
 import { GoogleGenAI, type FunctionDeclaration } from '@google/genai';
+import { envConfig } from '../config.js';
 
 export type ChatAttachment =
   | { type: 'image'; mimeType: string; base64: string; originalName?: string }
@@ -63,10 +64,10 @@ export class CopilotNotConfiguredError extends Error {
 }
 
 export function isConfigured(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY);
+  return Boolean(envConfig.geminiApiKey);
 }
 
-const MODEL = () => process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+const MODEL = () => envConfig.geminiModel;
 
 const draftProjectTool: FunctionDeclaration = {
   name: 'draftProject',
@@ -241,7 +242,7 @@ const scaffoldWorkspaceTool: FunctionDeclaration = {
 };
 
 export const realAskLLM: AskLLM = async (system, messages, opts = {}) => {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = envConfig.geminiApiKey;
   if (!apiKey) throw new CopilotNotConfiguredError();
   const ai = new GoogleGenAI({ apiKey });
   // Map our history to Gemini "contents"; assistant → model role.

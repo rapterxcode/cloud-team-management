@@ -19,6 +19,7 @@ import {
   type ChatAttachment,
 } from '../copilot/gemini.js';
 import { parseAttachmentFile } from '../copilot/document-parser.js';
+import { envConfig } from '../config.js';
 
 const ALLOWED_COPILOT_EXT = new Set([
   // Images
@@ -32,7 +33,6 @@ const ALLOWED_COPILOT_EXT = new Set([
   // Text, code, data
   '.txt', '.csv', '.json', '.md', '.log', '.yaml', '.yml', '.sql', '.sh', '.ts', '.js', '.py', '.html', '.xml',
 ]);
-const MAX_COPILOT_FILE_BYTES = 15 * 1024 * 1024; // 15 MB
 
 function makeCopilotUpload() {
   mkdirSync(ATTACHMENTS_DIR(), { recursive: true });
@@ -41,7 +41,7 @@ function makeCopilotUpload() {
       destination: (_req, _file, cb) => cb(null, ATTACHMENTS_DIR()),
       filename: (_req, _file, cb) => cb(null, `copilot-${randomUUID()}`),
     }),
-    limits: { fileSize: MAX_COPILOT_FILE_BYTES },
+    limits: { fileSize: envConfig.maxCopilotFileBytes },
     fileFilter: (_req, file, cb) => {
       const ext = extname(file.originalname).toLowerCase();
       if (!ALLOWED_COPILOT_EXT.has(ext)) {

@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { PrismaClient } from '@prisma/client';
+import { envConfig } from './config.js';
 
 declare module 'express-session' {
   interface SessionData {
@@ -49,10 +50,12 @@ const attempts = new Map<string, { count: number; resetAt: number }>();
 export function loginLimiter(req: Request, res: Response, next: NextFunction) {
   const key = `${req.ip}:${String(req.body?.email ?? '').toLowerCase()}`;
   const now = Date.now();
+  const maxAttempts = envConfig.loginRateLimitMax;
+  const windowMinutes = envConfig.loginRateLimitWindowMinutes;
   const slot = attempts.get(key);
-  if (slot && slot.resetAt > now && slot.count >= 10)
-    return res.status(429).json({ error: 'Too many attempts. Try again in 15 minutes.' });
-  if (!slot || slot.resetAt <= now) attempts.set(key, { count: 1, resetAt: now + 15 * 60_000 });
+  if (slot && slot.resetAt > now && slot.count >= maxAttempts)
+    return res.status(429).json({ error: `Too many attempts. Try again in ${windowMinutes} minutes.` });
+  if (!slot || slot.resetAt <= now) attempts.set(key, { count: 1, resetAt: now + windowMinutes * 60_000 });
   else slot.count += 1;
   next();
 }

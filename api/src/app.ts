@@ -1,9 +1,11 @@
+import './config.js';
 import express from 'express';
 import session from 'express-session';
 import connectPgSimple from 'connect-pg-simple';
 import pg from 'pg';
 import type { PrismaClient } from '@prisma/client';
-import { originCheck, requireAuditorReadOnly } from './middleware.js';
+import { config } from './config/index.js';
+import { originCheck, requireAuth, requireAuditorReadOnly } from './middleware.js';
 import { authRoutes } from './routes/auth.js';
 import { usersRoutes } from './routes/users.js';
 import { projectsRoutes } from './routes/projects.js';
@@ -25,17 +27,18 @@ let sessionPool: pg.Pool | undefined;
 function getSessionPool() {
   if (!sessionPool)
     sessionPool = new pg.Pool({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: config.db.url,
+      max: config.db.poolMax,
       // Let idle clients release the event loop so short-lived test processes exit.
-      allowExitOnIdle: process.env.NODE_ENV === 'test',
+      allowExitOnIdle: config.db.allowExitOnIdle,
     });
   return sessionPool;
 }
 
 export function createApp(prisma: PrismaClient, opts: { askLLM?: AskLLM } = {}) {
   const app = express();
-  app.set('trust proxy', 1);
-  app.use(express.json({ limit: '256kb' }));
+  app.set('trust proxy', config.app.trustProxy);
+  app.use(express.json({ limit: config.app.jsonBodyLimit }));
   app.use(originCheck);
 
   const PgStore = connectPgSimple(session);
@@ -47,22 +50,26 @@ export function createApp(prisma: PrismaClient, opts: { askLLM?: AskLLM } = {}) 
         // The prune-interval timer keeps the event loop alive once a session is
         // written, which hangs short-lived test processes. Disable it under test;
         // in prod the process runs forever so the timer is harmless.
-        ...(process.env.NODE_ENV === 'test' ? { pruneSessionInterval: false } : {}),
+        ...(config.app.isTest ? { pruneSessionInterval: false } : {}),
       }),
-      secret: process.env.SESSION_SECRET ?? 'dev-secret',
+      secret: config.auth.sessionSecret,
       resave: false,
       saveUninitialized: false,
       rolling: true,
       cookie: {
         httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
+        sameSite: config.auth.cookieSameSite,
+        secure: config.auth.cookieSecure,
       },
     }),
   );
 
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true });
+  });
+
+  app.get('/api/config', requireAuth, (_req, res) => {
+    res.json(config.getPublicRuntimeConfig());
   });
 
   app.use('/api/auth', authRoutes(prisma));

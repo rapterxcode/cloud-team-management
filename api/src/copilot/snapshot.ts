@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
+import { envConfig } from '../config.js';
 
-const TOTAL_BUDGET = 1_000_000; // 1M characters (~250k tokens), well within Gemini's 1M-token window
+const TOTAL_BUDGET = () => envConfig.copilotSnapshotBudget; // Default 1M characters (~250k tokens)
 
 function cleanHtmlForContext(html: string): string {
   // Strip heavy script and style tags to reduce token noise while preserving all semantic content, headings, and commands
@@ -111,6 +112,7 @@ export async function buildSnapshot(prisma: PrismaClient): Promise<string> {
   );
 
   let out = sections.join('\n\n');
-  if (out.length > TOTAL_BUDGET) out = out.slice(0, TOTAL_BUDGET) + '\n…(truncated)';
+  const budget = TOTAL_BUDGET();
+  if (out.length > budget) out = out.slice(0, budget) + '\n…(truncated)';
   return out;
 }

@@ -1,6 +1,8 @@
+import '../src/config.js';
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { hashPassword } from '../src/passwords.js';
+import { envConfig } from '../src/config.js';
 
 const DEMO_USERS = [
   { email: 'alex.morgan@demo.local', name: 'Alex Morgan', title: 'Platform Lead' },
@@ -22,8 +24,8 @@ export async function seed(prisma: PrismaClient) {
     users[d.name] = u.id;
   }
 
-  const adminEmail = (process.env.ADMIN_EMAIL ?? '').trim().toLowerCase();
-  const adminPassword = process.env.ADMIN_PASSWORD ?? '';
+  const adminEmail = envConfig.adminEmail;
+  const adminPassword = envConfig.adminPassword;
   let adminUserId = '';
   const activeAdmins = await prisma.user.count({ where: { role: 'admin', isActive: true } });
   if (activeAdmins === 0 && adminEmail && adminPassword) {

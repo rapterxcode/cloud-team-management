@@ -8,8 +8,7 @@ import type { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware.js';
 import { ATTACHMENTS_DIR } from './knowledge.js';
 import { AUDIT_CATEGORIES, DOCUMENT_EXTS, assertIn } from '../validate.js';
-
-const MAX_BYTES = 25 * 1024 * 1024;
+import { envConfig } from '../config.js';
 
 function makeUpload() {
   mkdirSync(ATTACHMENTS_DIR(), { recursive: true });
@@ -18,7 +17,7 @@ function makeUpload() {
       destination: (_req, _file, cb) => cb(null, ATTACHMENTS_DIR()),
       filename: (_req, _file, cb) => cb(null, randomUUID()),
     }),
-    limits: { fileSize: MAX_BYTES },
+    limits: { fileSize: envConfig.maxAttachmentBytes },
     fileFilter: (_req, file, cb) => {
       if (!DOCUMENT_EXTS.has(extname(file.originalname).toLowerCase()))
         return cb(Object.assign(new Error('This file type is not allowed'), { status: 400 }));

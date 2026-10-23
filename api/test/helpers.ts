@@ -1,3 +1,4 @@
+import '../src/config.js';
 import { PrismaClient } from '@prisma/client';
 import { createApp } from '../src/app.js';
 import { hashPassword } from '../src/passwords.js';

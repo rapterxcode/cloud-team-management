@@ -5,8 +5,9 @@ import type { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware.js';
 import { badRequest } from '../validate.js';
 import { recordAuditLog } from '../audit.js';
+import { envConfig } from '../config.js';
 
-export const ATTACHMENTS_DIR = () => process.env.ATTACHMENTS_DIR ?? './attachments-dev';
+export const ATTACHMENTS_DIR = () => envConfig.attachmentsDir;
 
 export const DEFAULT_CATEGORIES = [
   { name: 'Guides', color: 'purple', icon: 'BookOpen' },
