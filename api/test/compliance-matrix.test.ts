@@ -44,5 +44,20 @@ test('GET /api/compliance/matrix returns calculated compliance checkpoints', asy
   assert.ok(p2Res.missingCheckpoints.includes('CC'));
   assert.ok(p2Res.missingCheckpoints.includes('Deployment Traceability'));
 
+  // Verify optional workspaceId scoping
+  const ws2 = await prisma.workspace.create({
+    data: { id: 'ws-2-audit', name: 'Audit Workspace', type: 'security' },
+  });
+  await prisma.project.create({ data: { name: 'WS2 Project', workspaceId: ws2.id } });
+
+  const scopedRes = await fetch(
+    base + `/api/compliance/matrix?workspaceId=${encodeURIComponent(ws2.id)}`,
+    authed(cookie)
+  );
+  assert.equal(scopedRes.status, 200);
+  const scopedData = await scopedRes.json();
+  assert.equal(scopedData.summary.totalProjects, 1);
+  assert.equal(scopedData.projects[0].name, 'WS2 Project');
+
   await close();
 });

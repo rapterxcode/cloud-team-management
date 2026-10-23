@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware.js';
 import { badRequest } from '../validate.js';
+import { recordAuditLog } from '../audit.js';
 
 function costOf(value: unknown): number {
   const n = Number(value);
@@ -25,6 +26,18 @@ export function resourcesRoutes(prisma: PrismaClient) {
       const rsc = await prisma.cloudResource.create({
         data: { name: String(name).trim(), provider: String(provider).trim(), type: String(type).trim(), status: String(status), monthlyCost: costOf(monthlyCost) },
       });
+
+      const actor = await prisma.user.findUnique({ where: { id: req.session.userId! } });
+      if (actor) {
+        await recordAuditLog(prisma, {
+          actor: { id: actor.id, name: actor.name, role: actor.role },
+          action: 'CREATE',
+          entityType: 'CloudResource',
+          entityId: rsc.id,
+          details: { name: rsc.name, provider: rsc.provider, type: rsc.type, status: rsc.status, monthlyCost: rsc.monthlyCost },
+        });
+      }
+
       res.status(201).json(rsc);
     } catch (e) { next(e); }
   });
@@ -44,6 +57,21 @@ export function resourcesRoutes(prisma: PrismaClient) {
           ...(monthlyCost !== undefined ? { monthlyCost: costOf(monthlyCost) } : {}),
         },
       });
+
+      const actor = await prisma.user.findUnique({ where: { id: req.session.userId! } });
+      if (actor) {
+        await recordAuditLog(prisma, {
+          actor: { id: actor.id, name: actor.name, role: actor.role },
+          action: 'UPDATE',
+          entityType: 'CloudResource',
+          entityId: rsc.id,
+          details: {
+            before: { name: existing.name, provider: existing.provider, status: existing.status, monthlyCost: existing.monthlyCost },
+            after: { name: rsc.name, provider: rsc.provider, status: rsc.status, monthlyCost: rsc.monthlyCost },
+          },
+        });
+      }
+
       res.json(rsc);
     } catch (e) { next(e); }
   });
@@ -52,6 +80,18 @@ export function resourcesRoutes(prisma: PrismaClient) {
     const existing = await prisma.cloudResource.findUnique({ where: { id: req.params.id } });
     if (!existing) return res.status(404).json({ error: 'Resource not found' });
     await prisma.cloudResource.delete({ where: { id: req.params.id } });
+
+    const actor = await prisma.user.findUnique({ where: { id: req.session.userId! } });
+    if (actor) {
+      await recordAuditLog(prisma, {
+        actor: { id: actor.id, name: actor.name, role: actor.role },
+        action: 'DELETE',
+        entityType: 'CloudResource',
+        entityId: existing.id,
+        details: { name: existing.name, provider: existing.provider, monthlyCost: existing.monthlyCost },
+      });
+    }
+
     res.status(204).end();
   });
 

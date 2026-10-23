@@ -23,5 +23,15 @@ test('resource CRUD with monthly cost validation', async () => {
 
   assert.equal((await fetch(base + `/api/resources/${rsc.id}`, authed(cookie, 'DELETE'))).status, 204);
   assert.equal(await prisma.cloudResource.count(), 0);
+
+  const auditLogs = await prisma.auditLog.findMany({
+    where: { entityType: 'CloudResource', entityId: rsc.id },
+    orderBy: { createdAt: 'asc' },
+  });
+  assert.deepEqual(
+    auditLogs.map((l) => l.action),
+    ['CREATE', 'UPDATE', 'DELETE']
+  );
+
   await close();
 });

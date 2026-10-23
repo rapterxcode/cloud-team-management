@@ -6,8 +6,10 @@ export function complianceRoutes(prisma: PrismaClient) {
   const r = Router();
   r.use(requireAuth);
 
-  r.get('/matrix', async (_req, res) => {
+  r.get('/matrix', async (req, res) => {
+    const workspaceId = typeof req.query.workspaceId === 'string' && req.query.workspaceId ? req.query.workspaceId : undefined;
     const projects = await prisma.project.findMany({
+      where: workspaceId ? { workspaceId } : undefined,
       include: {
         tasks: { select: { id: true, phase: true, status: true, changeDocumentId: true, name: true } },
         documents: { select: { id: true, category: true, referenceNo: true, originalName: true } },
