@@ -337,43 +337,43 @@ docker compose cp backup:/backups ./offsite-backups
 
 ```
 cloud-team-management/
-├── api/                             # Node.js Express & Prisma Backend
-│   ├── prisma/                      # Prisma Schema & Database Seeder
+├── cloud-team-db/                   # 1. Standalone Database & Backup Project
+│   ├── compose.yml                  # PostgreSQL 17 (ctm-postgres) + Backup (ctm-backup) + ctm-network
+│   ├── prisma/                      # Prisma Schema, Migrations & Seed
 │   │   ├── schema.prisma            # Data models, relations, indices
+│   │   ├── migrations/              # SQL migration history
 │   │   └── seed.ts                  # Idempotent seed data
+│   ├── backup/backup.sh             # Nightly pg_dump backup script
+│   └── package.json                 # Standalone DB CLI scripts (db:up, db:migrate, db:seed)
+├── cloud-team-backend/              # 2. Standalone Node.js Express & Prisma Backend API
 │   ├── src/                         # API Source Code
-│   │   ├── copilot/                 # AI Copilot logic (Gemini, context snapshot, parsers)
-│   │   ├── routes/                  # Express endpoints (auth, projects, tasks, logs, etc.)
-│   │   ├── audit.ts                 # AuditLog mutation logger
-│   │   ├── middleware.ts            # RBAC, Workspace & Auditor guards
-│   │   ├── passwords.ts             # Crypto scrypt hashing
+│   │   ├── config/                  # 12-Factor Modular Configuration (app, db, auth, storage, ai)
+│   │   ├── copilot/                 # AI Copilot logic (Gemini 3.8 Flash, snapshot, parsers)
+│   │   ├── routes/                  # Express endpoints (auth, projects, tasks, resources, logs, etc.)
+│   │   ├── audit.ts                 # AuditLog & AccessLog immutable logger
+│   │   ├── middleware.ts            # RBAC, CORS/Origin & Auditor guards
 │   │   └── index.ts                 # API Server entrypoint
-│   ├── test/                        # Integration test suite
-│   └── Dockerfile                   # Multi-stage API image
-├── web/                             # React 19 Frontend SPA
+│   ├── test/                        # 63 Integration & Unit tests
+│   ├── Dockerfile                   # Self-contained multi-stage API image (context: .)
+│   └── compose.yml                  # Standalone ctm-api (:3000) service
+├── cloud-team-frontend/             # 3. Standalone React 19 Frontend SPA + Caddy 2 Proxy
 │   ├── src/
+│   │   ├── views/                   # Modular Feature Views (Overview, Projects, Kanban, FinOps, etc.)
 │   │   ├── components/              # Reusable UI components (Tailwind + Shadcn)
-│   │   ├── lib/                     # Pure business logic, helpers, and tests
-│   │   ├── App.tsx                  # Main application router and state
-│   │   ├── copilot.tsx              # AI Copilot interactive drawer & chat
-│   │   ├── project-gantt.tsx        # Interactive Gantt chart & task drawer
-│   │   ├── compliance-matrix.tsx    # ISO 27001 / BOT compliance view
-│   │   ├── logs-viewer.tsx          # Audit & Access log viewer
-│   │   └── workspace-switcher.tsx   # Workspace switcher & member manager
-│   ├── package.json                 # Frontend dependencies
-│   └── vite.config.ts               # Vite bundler configuration
-├── caddy/                           # Reverse Proxy configuration
-│   ├── Caddyfile                    # Automatic HTTPS & proxy rules
-│   └── Dockerfile                   # Multi-stage build (Web SPA + Caddy)
-├── backup/                          # Disaster recovery & automated backup
-│   └── backup.sh                    # Nightly backup script
-├── attachments/                     # Host persistent storage for uploaded documents
-├── docs/                            # Architectural & Operational Documentation
-│   ├── adr/                         # Architecture Decision Records (0001 - 0011)
-│   ├── DEPLOY.md                    # Deployment guide & restore rehearsal runbook
-│   ├── HANDOFF.md                   # Platform migration handoff notes
-│   └── superpowers/                 # Engineering specs and plans
-├── compose.yml                      # Production Docker Compose orchestration
+│   │   ├── lib/                     # Pure business logic, runtime config, and 60 unit tests
+│   │   └── App.tsx                  # Modernized shell with React.lazy() + Suspense code splitting
+│   ├── Caddyfile                    # Automatic HTTPS & /api/* reverse proxy rules
+│   ├── Dockerfile                   # Self-contained multi-stage build (Vite SPA + Caddy 2)
+│   └── compose.yml                  # Standalone ctm-frontend (:80 / :443) service
+├── scripts/
+│   └── stack-ctl.sh                 # Multi-tier stack controller (up / down / status)
+├── docs/                            # Architectural & Enterprise Specification Suite
+│   ├── DRAFT_BRD.md / BRD.md        # Business Requirements Documents
+│   ├── DRAFT_PRD.md / PRD.md        # Product Requirements Documents
+│   ├── TDD.md                       # Technical Design Document
+│   ├── adr/                         # Architecture Decision Records (0001 - 0014)
+│   └── superpowers/plans/           # Implementation Plans
+├── compose.yml                      # Root Compose orchestrator (via include:)
 ├── CONTEXT.md                       # Ubiquitous domain language dictionary
 ├── AGENTS.md                        # AI Multi-Agent SDLC Guidelines & RACI Matrix
 └── VALIDATION.md                    # Verification evidence and test logs
@@ -383,6 +383,7 @@ cloud-team-management/
 
 ## เอกสารอ้างอิงเพิ่มเติม (References & ADRs)
 
+- [BRD.md](file:///Users/pasitc/PH/cloud-team-management/docs/BRD.md) | [PRD.md](file:///Users/pasitc/PH/cloud-team-management/docs/PRD.md) | [TDD.md](file:///Users/pasitc/PH/cloud-team-management/docs/TDD.md) — เอกสารข้อกำหนดทางธุรกิจ ผลิตภัณฑ์ และการออกแบบทางเทคนิค
 - [CONTEXT.md](file:///Users/pasitc/PH/cloud-team-management/CONTEXT.md) — พจนานุกรมศัพท์โดเมน (Ubiquitous Language) ประจำระบบ
 - [DEPLOY.md](file:///Users/pasitc/PH/cloud-team-management/docs/DEPLOY.md) — คู่มือการติดตั้งระบบและการกู้คืนข้อมูลแบบละเอียด
 - [AGENTS.md](file:///Users/pasitc/PH/cloud-team-management/AGENTS.md) — แนวทางการพัฒนาซอฟต์แวร์แบบ Multi-Agent AI SDLC
@@ -399,6 +400,9 @@ cloud-team-management/
   - [ADR 0009](file:///Users/pasitc/PH/cloud-team-management/docs/adr/0009-agentic-copilot-batch-tasks-and-executive-reporting.md) — Agentic Copilot Batch Tasks and Executive Reporting
   - [ADR 0010](file:///Users/pasitc/PH/cloud-team-management/docs/adr/0010-copilot-conversation-history-persistence.md) — Copilot Conversation History Persistence
   - [ADR 0011](file:///Users/pasitc/PH/cloud-team-management/docs/adr/0011-multi-workspace-rbac-and-audit-access-logs.md) — Multi-Workspace RBAC and Audit/Access Logs
+  - [ADR 0012](file:///Users/pasitc/PH/cloud-team-management/docs/adr/0012-modernized-modular-configuration-architecture.md) — 12-Factor Modular Configuration Architecture
+  - [ADR 0013](file:///Users/pasitc/PH/cloud-team-management/docs/adr/0013-frontend-modular-views-and-lazy-code-splitting.md) — Frontend Modular Views, Live FinOps Inventory & Lazy Code Splitting
+  - [ADR 0014](file:///Users/pasitc/PH/cloud-team-management/docs/adr/0014-decoupled-3-repos-db-backend-frontend.md) — Decoupled 3-Tier Architecture (`cloud-team-db`, `cloud-team-backend`, `cloud-team-frontend`)
 
 ---
 

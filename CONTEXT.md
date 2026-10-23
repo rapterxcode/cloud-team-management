@@ -135,3 +135,12 @@ _Avoid_: Container volume, temp upload folder
 An uploaded file (image, PDF, Word, Excel, PowerPoint, Outlook `.msg`/`.eml`, code, log, or text) parsed and grounded directly into Gemini 3.8 Flash prompts for deep context reasoning, document analysis, and task/runbook generation.
 _Avoid_: Chat upload, copilot file
 
+**Modular configuration**:
+A 12-Factor domain-scoped configuration registry (`api/src/config/*`) that reads and validates `.env` environment variables into typed namespaces (`app`, `db`, `auth`, `storage`, `ai`) and exposes sanitized public settings via `GET /api/config` (`web/src/lib/config.ts`) without leaking secrets.
+_Avoid_: Monolithic config, scattered `process.env` reads
+
+**Cloud resource**:
+A provisioned infrastructure workload or service tracked in the Multi-Cloud Resources & FinOps Inventory (`CloudResourcesView`), recording its cloud provider (`AWS`, `GCP`, `Azure`), service type, operational health status (`Healthy` or `Review needed`), and monthly cost allocation (`$/mo`), with all mutations recorded in `AuditLog`.
+_Avoid_: Server row, static placeholder asset
+
+

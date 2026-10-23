@@ -623,4 +623,54 @@ User requested: "ทำเป็น conversations history ให้หน่อ�
 - **Live Health Endpoint:** `curl -sk https://localhost/api/health` -> HTTP/2 200 `{"ok":true}`.
 - **Data Integrity:** 100% backward compatible; all legacy projects, tasks, articles, and users preserved and linked to default workspace.
 
+---
+
+## Platform Modernization: 12-Factor Modular Config, Modular Views, Lazy Code Splitting & Live FinOps Inventory — 2026-10-23
+
+Branch `feat/platform-modernization`. Plan: `docs/superpowers/plans/2026-10-23-platform-modernization-and-finops-governance.md`, ADRs: `docs/adr/0012-modernized-modular-configuration-architecture.md`, `docs/adr/0013-frontend-modular-views-and-lazy-code-splitting.md`.
+
+**Architecture & Implementation:**
+1. **Enterprise Specification Suite (`docs/`):**
+   - Authored `docs/DRAFT_BRD.md`, `docs/BRD.md`, `docs/DRAFT_PRD.md`, `docs/PRD.md`, and `docs/TDD.md` with bilingual English/Thai architectural documentation and Mermaid diagrams.
+   - Updated `CONTEXT.md` ubiquitous language with `Modular configuration` and `Cloud resource`.
+2. **12-Factor Modular Configuration Architecture (`api/src/config/*`, `web/src/lib/config.ts`):**
+   - Replaced scattered `process.env` reads with domain-scoped configuration modules (`app.config.ts`, `database.config.ts`, `auth.config.ts`, `storage.config.ts`, `ai.config.ts`, `index.ts`) and backward-compatible facade `api/src/config.ts`.
+   - Added authenticated `GET /api/config` endpoint returning sanitized public runtime configuration without exposing secrets.
+   - Added `web/src/lib/config.ts` client runtime config loader.
+3. **Backend Enterprise Governance (`api/src/routes/resources.ts`, `api/src/routes/compliance.ts`):**
+   - Added immutable `AuditLog` recording (`CREATE`, `UPDATE`, `DELETE` for `entityType: 'CloudResource'`) on `/api/resources`.
+   - Added optional `?workspaceId=` scoping on `GET /api/compliance/matrix`.
+4. **Frontend Modular View Architecture & Dynamic Code Splitting (`web/src/views/*`, `web/src/App.tsx`):**
+   - Extracted monolithic `web/src/App.tsx` into modular domain views (`overview-view.tsx`, `projects-view.tsx`, `tasks-kanban-view.tsx`, `team-view.tsx`, `cloud-resources-view.tsx`, `reports-view.tsx`, `knowledge-view.tsx`, `entity-form-dialog.tsx`).
+   - Replaced the static "Coming Soon" placeholder on `Cloud resources` with live `CloudResourcesView` supporting FinOps KPIs, search, provider/status filtering, and full CRUD wired to `/api/resources` with auditor read-only guard.
+   - Introduced `React.lazy()` and `<Suspense>` code splitting, reducing the main JS bundle from `848.87 kB` to `415.67 kB` (`130.80 kB` gzipped) across 28 chunks with zero build warnings.
+
+**Verification Evidence:**
+- **API Automated Tests:** `npm --prefix api test` -> **63/63 passed (100% green)** (including `api/test/config.test.ts`, `api/test/resources.test.ts` audit trail assertions, and `api/test/compliance-matrix.test.ts` workspace scoping).
+- **Web Unit Tests:** `npm --prefix web test` -> **60/60 passed (100% green)**.
+- **Production Compile:** `npm --prefix api run build` & `npm --prefix web run build` clean with 0 errors and 0 chunk size warnings.
+- **Docker Compose Live Reload:** `docker compose up -d --build` -> all 4 services (`caddy`, `api`, `postgres`, `backup`) healthy; `curl -sk https://localhost/api/health` -> `{"ok":true}`.
+
+---
+
+## Decoupled 3-Repository Architecture (`cloud-team-db`, `cloud-team-backend`, `cloud-team-frontend`) — 2026-10-23
+
+Branch `feat/split-db-backend-frontend`. Plan: `docs/superpowers/plans/2026-10-23-decoupled-3-repos-db-backend-frontend.md`, ADR: `docs/adr/0014-decoupled-3-repos-db-backend-frontend.md`.
+
+**Separated Sub-Projects Created under `cloud-team-management/`:**
+1. **`/Users/pasitc/PH/cloud-team-management/cloud-team-db` (`cloud-team-db`):**
+   - Standalone PostgreSQL 17 (`ctm-postgres`) + automated `pg_dump` backup (`ctm-backup`) on shared bridge network `ctm-network`.
+   - Owns `prisma/schema.prisma`, `prisma/migrations/*`, and standalone `prisma/seed.ts`.
+2. **`/Users/pasitc/PH/cloud-team-management/cloud-team-backend` (`cloud-team-backend`):**
+   - Standalone Express + TypeScript + Prisma + Gemini 3.8 Flash API (`ctm-api`) with self-contained `Dockerfile` (`context: .`) and `compose.yml`.
+   - Connects to PostgreSQL strictly via `DATABASE_URL` over `ctm-network` (zero bundled DB containers).
+   - Supports configurable `ALLOWED_ORIGINS` for CORS & CSRF validation when Frontend is hosted on a separate origin.
+3. **`/Users/pasitc/PH/cloud-team-management/cloud-team-frontend` (`cloud-team-frontend`):**
+   - Standalone React 19 + Vite 8 + Tailwind CSS 4 SPA (`ctm-frontend`) with self-contained `Dockerfile` (`context: .`), `Caddyfile` (`reverse_proxy {$API_UPSTREAM:ctm-api:3000}`), and `compose.yml`.
+   - Supports `VITE_API_BASE_URL` and `VITE_API_TARGET` for flexible backend routing.
+4. **Multi-Repo Orchestrator (`scripts/stack-ctl.sh`):**
+   - Convenience script (`./scripts/stack-ctl.sh {up|down|status}`) to orchestrate all 3 standalone repositories in dependency order (`db` -> `backend` -> `frontend`).
+
+
+
 

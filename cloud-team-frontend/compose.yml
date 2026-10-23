@@ -1,0 +1,29 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ctm-frontend
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+      API_UPSTREAM: ${API_UPSTREAM:-ctm-api:3000}
+    volumes:
+      - ctm_caddy_data:/data
+      - ctm_caddy_config:/config
+    networks:
+      - default
+
+networks:
+  default:
+    name: ctm-network
+    external: true
+
+volumes:
+  ctm_caddy_data:
+    name: ctm_caddy_data
+  ctm_caddy_config:
+    name: ctm_caddy_config

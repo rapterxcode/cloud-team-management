@@ -1,0 +1,13 @@
+{$DOMAIN:localhost} {
+	encode gzip
+
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:ctm-api:3000}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
