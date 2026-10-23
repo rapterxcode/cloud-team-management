@@ -25,4 +25,11 @@ export const appConfig = {
   get trustProxy() {
     return envInt('TRUST_PROXY_HOPS', 1);
   },
+  get allowedOrigins(): string[] {
+    const raw = envString('ALLOWED_ORIGINS', '');
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  },
 };

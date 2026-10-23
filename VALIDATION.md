@@ -651,5 +651,26 @@ Branch `feat/platform-modernization`. Plan: `docs/superpowers/plans/2026-10-23-p
 - **Production Compile:** `npm --prefix api run build` & `npm --prefix web run build` clean with 0 errors and 0 chunk size warnings.
 - **Docker Compose Live Reload:** `docker compose up -d --build` -> all 4 services (`caddy`, `api`, `postgres`, `backup`) healthy; `curl -sk https://localhost/api/health` -> `{"ok":true}`.
 
+---
+
+## Decoupled 3-Repository Architecture (`cloud-team-db`, `cloud-team-backend`, `cloud-team-frontend`) — 2026-10-23
+
+Branch `feat/split-db-backend-frontend`. Plan: `docs/superpowers/plans/2026-10-23-decoupled-3-repos-db-backend-frontend.md`, ADR: `docs/adr/0014-decoupled-3-repos-db-backend-frontend.md`.
+
+**Separated Sub-Projects Created under `cloud-team-management/`:**
+1. **`/Users/pasitc/PH/cloud-team-management/cloud-team-db` (`cloud-team-db`):**
+   - Standalone PostgreSQL 17 (`ctm-postgres`) + automated `pg_dump` backup (`ctm-backup`) on shared bridge network `ctm-network`.
+   - Owns `prisma/schema.prisma`, `prisma/migrations/*`, and standalone `prisma/seed.ts`.
+2. **`/Users/pasitc/PH/cloud-team-management/cloud-team-backend` (`cloud-team-backend`):**
+   - Standalone Express + TypeScript + Prisma + Gemini 3.8 Flash API (`ctm-api`) with self-contained `Dockerfile` (`context: .`) and `compose.yml`.
+   - Connects to PostgreSQL strictly via `DATABASE_URL` over `ctm-network` (zero bundled DB containers).
+   - Supports configurable `ALLOWED_ORIGINS` for CORS & CSRF validation when Frontend is hosted on a separate origin.
+3. **`/Users/pasitc/PH/cloud-team-management/cloud-team-frontend` (`cloud-team-frontend`):**
+   - Standalone React 19 + Vite 8 + Tailwind CSS 4 SPA (`ctm-frontend`) with self-contained `Dockerfile` (`context: .`), `Caddyfile` (`reverse_proxy {$API_UPSTREAM:ctm-api:3000}`), and `compose.yml`.
+   - Supports `VITE_API_BASE_URL` and `VITE_API_TARGET` for flexible backend routing.
+4. **Multi-Repo Orchestrator (`scripts/stack-ctl.sh`):**
+   - Convenience script (`./scripts/stack-ctl.sh {up|down|status}`) to orchestrate all 3 standalone repositories in dependency order (`db` -> `backend` -> `frontend`).
+
+
 
 

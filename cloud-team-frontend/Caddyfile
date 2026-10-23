@@ -1,8 +1,8 @@
-{$DOMAIN} {
+{$DOMAIN:localhost} {
 	encode gzip
 
 	handle /api/* {
-		reverse_proxy api:3000
+		reverse_proxy {$API_UPSTREAM:ctm-api:3000}
 	}
 
 	handle {

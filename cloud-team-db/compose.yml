@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: ctm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ctm}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - ctm_pgdata:/var/lib/postgresql/data
+    networks:
+      default:
+        aliases:
+          - postgres
+          - ctm-postgres
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ctm}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backup:
+    image: postgres:17
+    container_name: ctm-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: ctm-postgres
+      PGUSER: ${POSTGRES_USER:-postgres}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-ctm}
+    volumes:
+      - ctm_backups:/backups
+      - ./backup/backup.sh:/backup.sh:ro
+    entrypoint: ['bash', '/backup.sh']
+    networks:
+      - default
+    depends_on:
+      postgres: { condition: service_healthy }
+
+networks:
+  default:
+    name: ctm-network
+
+volumes:
+  ctm_pgdata:
+    name: ctm_pgdata
+  ctm_backups:
+    name: ctm_backups

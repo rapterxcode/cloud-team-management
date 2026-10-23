@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "projects" ADD COLUMN "year" INTEGER NOT NULL DEFAULT 2026;

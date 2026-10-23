@@ -1,81 +1,8 @@
-services:
-  caddy:
-    build: { context: ., dockerfile: caddy/Dockerfile }
-    restart: unless-stopped
-    ports: ['80:80', '443:443']
-    environment:
-      DOMAIN: ${DOMAIN}
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      api: { condition: service_healthy }
-
-  api:
-    build: { context: ., dockerfile: api/Dockerfile }
-    restart: unless-stopped
-    environment:
-      PORT: ${PORT:-3000}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ctm}
-      SESSION_SECRET: ${SESSION_SECRET}
-      LOGIN_RATE_LIMIT_MAX: ${LOGIN_RATE_LIMIT_MAX:-10}
-      LOGIN_RATE_LIMIT_WINDOW_MINUTES: ${LOGIN_RATE_LIMIT_WINDOW_MINUTES:-15}
-      JSON_BODY_LIMIT: ${JSON_BODY_LIMIT:-256kb}
-      ADMIN_EMAIL: ${ADMIN_EMAIL}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-      ATTACHMENTS_DIR: /attachments
-      MAX_ATTACHMENT_BYTES: ${MAX_ATTACHMENT_BYTES:-26214400}
-      MAX_COPILOT_FILE_BYTES: ${MAX_COPILOT_FILE_BYTES:-15728640}
-      NODE_ENV: production
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
-      COPILOT_SNAPSHOT_BUDGET: ${COPILOT_SNAPSHOT_BUDGET:-1000000}
-    volumes:
-      - ./attachments:/attachments
-    healthcheck:
-      # exec form + single-quoted JS avoids YAML/shell quote-escaping; node:22-slim has no curl/wget.
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    depends_on:
-      postgres: { condition: service_healthy }
-
-  postgres:
-    image: postgres:17
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB:-ctm}
-    ports:
-      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ctm}']
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
-  backup:
-    image: postgres:17
-    restart: unless-stopped
-    environment:
-      PGHOST: postgres
-      PGUSER: ${POSTGRES_USER:-postgres}
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-      PGDATABASE: ${POSTGRES_DB:-ctm}
-    volumes:
-      - backups:/backups
-      - ./attachments:/attachments:ro
-      - ./backup/backup.sh:/backup.sh:ro
-    entrypoint: ['bash', '/backup.sh']
-    depends_on:
-      postgres: { condition: service_healthy }
-
-volumes:
-  pgdata:
-  backups:
-  caddy_data:
-  caddy_config:
+# Root Orchestration Compose File (Optional — delegates to the 3 decoupled sub-projects)
+include:
+  - path: ./cloud-team-db/compose.yml
+    env_file: ./cloud-team-db/.env
+  - path: ./cloud-team-backend/compose.yml
+    env_file: ./cloud-team-backend/.env
+  - path: ./cloud-team-frontend/compose.yml
+    env_file: ./cloud-team-frontend/.env

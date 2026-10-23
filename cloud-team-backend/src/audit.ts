@@ -57,7 +57,7 @@ export interface RecordAuditLogParams {
   };
   workspaceId?: string | null;
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'APPROVE' | 'ROLE_CHANGE' | 'UPLOAD';
-  entityType: 'Project' | 'Task' | 'KnowledgeArticle' | 'ProjectDocument' | 'WorkspaceMember' | 'User' | 'Workspace';
+  entityType: 'Project' | 'Task' | 'KnowledgeArticle' | 'ProjectDocument' | 'WorkspaceMember' | 'User' | 'Workspace' | 'CloudResource';
   entityId: string;
   details?: Record<string, any>;
 }

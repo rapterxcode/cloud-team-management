@@ -1,0 +1,218 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   String                @id @default(uuid())
+  email                String                @unique
+  passwordHash         String                @map("password_hash")
+  name                 String
+  title                String                @default("")
+  role                 String                @default("member")
+  isActive             Boolean               @default(true) @map("is_active")
+  createdAt            DateTime              @default(now()) @map("created_at")
+  tasks                Task[]
+  articles             KnowledgeArticle[]
+  uploads              KnowledgeAttachment[]
+  projectDocuments     ProjectDocument[]     @relation("ProjectDocumentUploader")
+  copilotConversations CopilotConversation[]
+  memberships          WorkspaceMember[]
+  accessLogs           AccessLog[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String            @id @default(uuid())
+  name        String
+  type        String            @default("engineering") // "engineering" | "audit" | "operations" | "general"
+  description String            @default("")
+  color       String            @default("purple")
+  icon        String            @default("Cloud")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  members     WorkspaceMember[]
+  projects    Project[]
+  articles    KnowledgeArticle[]
+  auditLogs   AuditLog[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid())
+  workspaceId String    @map("workspace_id")
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        String    @default("member") // "admin" | "lead" | "member" | "auditor" | "viewer"
+  joinedAt    DateTime  @default(now()) @map("joined_at")
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model AccessLog {
+  id            String   @id @default(uuid())
+  userId        String?  @map("user_id")
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email         String
+  action        String   // "LOGIN_SUCCESS" | "LOGIN_FAILURE" | "LOGOUT" | "PASSWORD_CHANGE"
+  ipAddress     String   @default("") @map("ip_address")
+  userAgent     String   @default("") @map("user_agent")
+  failureReason String?  @map("failure_reason")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("access_logs")
+}
+
+model AuditLog {
+  id          String     @id @default(uuid())
+  workspaceId String?    @map("workspace_id")
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  actorId     String     @map("actor_id")
+  actorName   String     @map("actor_name")
+  actorRole   String     @map("actor_role")
+  action      String     // "CREATE" | "UPDATE" | "DELETE" | "APPROVE" | "ROLE_CHANGE" | "UPLOAD"
+  entityType  String     @map("entity_type") // "Project" | "Task" | "KnowledgeArticle" | "ProjectDocument" | "WorkspaceMember" | "User" | "Workspace"
+  entityId    String     @map("entity_id")
+  details     Json?      @default("{}")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+model Project {
+  id          String            @id @default(uuid())
+  workspaceId String?           @map("workspace_id")
+  workspace   Workspace?        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  description String            @default("")
+  status      String            @default("On track")
+  progress    Int               @default(0)
+  department  String            @default("Platform")
+  due         String            @default("Not set")
+  color       String            @default("purple")
+  year        Int               @default(2026)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  tasks       Task[]
+  articles    KnowledgeArticle[]
+  documents   ProjectDocument[]
+
+  @@map("projects")
+}
+
+model Task {
+  id               String            @id @default(uuid())
+  projectId        String            @map("project_id")
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name             String
+  description      String            @default("")
+  ownerId          String            @map("owner_id")
+  owner            User              @relation(fields: [ownerId], references: [id])
+  phase            String            @default("Planning")
+  status           String            @default("To do")
+  priority         String            @default("Medium")
+  start            String            @default("")
+  date             String            @default("")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  sopArticleId     String?           @map("sop_article_id")
+  sopArticle       KnowledgeArticle? @relation(fields: [sopArticleId], references: [id])
+  changeDocumentId String?           @map("change_document_id")
+  changeDocument   ProjectDocument?  @relation("TaskChangeAuthorization", fields: [changeDocumentId], references: [id])
+
+  @@map("tasks")
+}
+
+model KnowledgeArticle {
+  id          String                @id @default(uuid())
+  workspaceId String?               @map("workspace_id")
+  workspace   Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  isGlobal    Boolean               @default(false) @map("is_global")
+  name        String
+  category    String
+  body        String
+  format      String                @default("markdown")
+  chatHistory Json?                 @map("chat_history")
+  authorId    String                @map("author_id")
+  author      User                  @relation(fields: [authorId], references: [id])
+  projectId   String?               @map("project_id")
+  project     Project?              @relation(fields: [projectId], references: [id])
+  createdAt   DateTime              @default(now()) @map("created_at")
+  updatedAt   DateTime              @updatedAt @map("updated_at")
+  attachments KnowledgeAttachment[]
+  tasks       Task[]
+
+  @@map("knowledge_articles")
+}
+
+model KnowledgeCategory {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String   @default("purple")
+  icon      String   @default("BookOpen")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("knowledge_categories")
+}
+
+model KnowledgeAttachment {
+  id           String           @id @default(uuid())
+  articleId    String           @map("article_id")
+  article      KnowledgeArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  storedName   String           @unique @map("stored_name")
+  originalName String           @map("original_name")
+  mimeType     String           @map("mime_type")
+  sizeBytes    Int              @map("size_bytes")
+  uploadedById String           @map("uploaded_by")
+  uploadedBy   User             @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  @@map("knowledge_attachments")
+}
+
+model CloudResource {
+  id          String @id @default(uuid())
+  name        String
+  provider    String
+  type        String
+  status      String @default("Healthy")
+  monthlyCost Int    @default(0) @map("monthly_cost")
+
+  @@map("cloud_resources")
+}
+
+model ProjectDocument {
+  id           String   @id @default(uuid())
+  projectId    String   @map("project_id")
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  storedName   String   @unique @map("stored_name")
+  originalName String   @map("original_name")
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  category     String   // "CR", "CC", "CRA", "Diagram", "RBAC", "TestEvidence", "General"
+  referenceNo  String   @default("") @map("reference_no") // e.g. "CR-2026-001"
+  uploadedById String   @map("uploaded_by")
+  uploadedBy   User     @relation("ProjectDocumentUploader", fields: [uploadedById], references: [id])
+  createdAt    DateTime @default(now()) @map("created_at")
+  tasks        Task[]   @relation("TaskChangeAuthorization")
+
+  @@map("project_documents")
+}
+
+model CopilotConversation {
+  id        String   @id @default(uuid())
+  title     String   @default("New Conversation")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Json     @default("[]")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("copilot_conversations")
+}

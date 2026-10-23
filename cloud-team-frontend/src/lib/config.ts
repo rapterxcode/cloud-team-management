@@ -20,6 +20,11 @@ export interface PublicRuntimeConfig {
 
 const metaEnv = (import.meta as { env?: Record<string, string | undefined> }).env ?? {};
 
+export const envConfig = {
+  apiBaseUrl: metaEnv.VITE_API_BASE_URL || '/api',
+  appName: metaEnv.VITE_APP_NAME || 'Cloud Team Management',
+};
+
 export const defaultClientConfig: PublicRuntimeConfig = {
   app: {
     domain: metaEnv.VITE_DOMAIN || 'localhost',

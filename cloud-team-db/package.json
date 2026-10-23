@@ -1,0 +1,25 @@
+{
+  "name": "cloud-team-db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone PostgreSQL 17 database, Prisma schema, migrations, seed, and backup stack for Cloud Team Management",
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "^6.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "prisma": "^6.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
